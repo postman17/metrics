@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -18,6 +19,7 @@ func UpdateMetricPage(memory *mem.MemStorage) http.HandlerFunc {
 		metricValue := r.PathValue("value")
 		if metricType == "" || metricName == "" || metricValue == "" {
 			rw.WriteHeader(http.StatusNotFound)
+			fmt.Println(metricType, metricName, metricValue)
 			return
 		}
 
@@ -52,5 +54,6 @@ func UpdateMetricPage(memory *mem.MemStorage) http.HandlerFunc {
 
 		rw.Header().Set("Content-Type", "text/plain")
 		rw.WriteHeader(http.StatusOK)
+		fmt.Println(memory)
 	}
 }
