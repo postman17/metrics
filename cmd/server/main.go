@@ -9,6 +9,8 @@ import (
 )
 
 func main() {
+	parseFlags()
+
 	memory := repo.NewMemStorage()
 
 	r := chi.NewRouter()
@@ -17,7 +19,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(memory))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(memory))
 
-	err := http.ListenAndServe(":8080", r)
+	err := http.ListenAndServe(flagRunAddr, r)
 	if err != nil {
 		panic(err)
 	}
