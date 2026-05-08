@@ -9,7 +9,7 @@ import (
 )
 
 func SendGaugeData(client http.Client, config Config, name string, data float64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update/gauge/%s/%v", config.runAddr, name, data)
+	url := fmt.Sprintf("%s/update/gauge/%s/%v", config.RunAddr, name, data)
 	resp, err := client.Post(url, "text/plain", nil)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -19,7 +19,7 @@ func SendGaugeData(client http.Client, config Config, name string, data float64)
 }
 
 func SendCounterData(client http.Client, config Config, name string, data int64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update/counter/%s/%v", config.runAddr, name, data)
+	url := fmt.Sprintf("%s/update/counter/%s/%v", config.RunAddr, name, data)
 	resp, err := client.Post(url, "text/plain", nil)
 	if err != nil {
 		fmt.Println("Error:", err)
@@ -31,8 +31,8 @@ func SendCounterData(client http.Client, config Config, name string, data int64)
 func main() {
 	config := parseFlags()
 
-	tickerPoll := time.NewTicker(time.Duration(config.pollInterval) * time.Second)
-	tickerReport := time.NewTicker(time.Duration(config.reportInterval) * time.Second)
+	tickerPoll := time.NewTicker(time.Duration(config.PollInterval) * time.Second)
+	tickerReport := time.NewTicker(time.Duration(config.ReportInterval) * time.Second)
 	defer tickerPoll.Stop()
 	defer tickerReport.Stop()
 	client := &http.Client{

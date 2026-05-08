@@ -19,7 +19,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(memory))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(memory))
 
-	err := http.ListenAndServe(config.runAddr, r)
+	err := http.ListenAndServe(config.RunAddr, r)
 	if err != nil {
 		panic(err)
 	}

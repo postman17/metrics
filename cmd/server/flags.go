@@ -2,19 +2,30 @@ package main
 
 import (
 	"flag"
+	"fmt"
+
+	"github.com/caarlos0/env/v11"
 )
 
 type Config struct {
-	runAddr string
+	RunAddr string `env:"ADDRESS"`
 }
 
 func parseFlags() Config {
+	cfg := Config{}
+	if err := env.Parse(&cfg); err != nil {
+		fmt.Println("Error:", err)
+	}
 	var (
-		runAddr string
+		runAddr string = cfg.RunAddr
 	)
-	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
-	flag.Parse()
-
-	config := Config{runAddr: runAddr}
+	if cfg.RunAddr == "" {
+		flag.StringVar(&runAddr, "a", "", "address and port to run server")
+		flag.Parse()
+	}
+	if runAddr == "" {
+		runAddr = "localhost:8080"
+	}
+	config := Config{RunAddr: runAddr}
 	return config
 }
