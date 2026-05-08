@@ -3,6 +3,7 @@ module github.com/postman17/metrics
 go 1.25.4
 
 require (
+	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/stretchr/testify v1.11.1
 )

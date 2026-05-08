@@ -24,8 +24,8 @@ func TestGaugeClient(t *testing.T) {
 			}
 		}),
 	}
-
-	resp, err := SendGaugeData(*client, "test", 1.5)
+	config := Config{}
+	resp, err := SendGaugeData(*client, config, "test", 1.5)
 
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -43,8 +43,8 @@ func TestCounterClient(t *testing.T) {
 			}
 		}),
 	}
-
-	resp, err := SendCounterData(*client, "test", 1)
+	config := Config{}
+	resp, err := SendCounterData(*client, config, "test", 1)
 
 	require.NoError(t, err)
 	defer resp.Body.Close()

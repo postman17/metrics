@@ -37,6 +37,14 @@ func (m MemStorage) CheckCounterType(name string) bool {
 	return false
 }
 
+func (m MemStorage) GetTypeValue(name string) any {
+	val, ok := m.Data[name]
+	if !ok {
+		return nil
+	}
+	return val
+}
+
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
 		Data: make(map[string]any),
