@@ -1,16 +1,16 @@
 package repository
 
 type MemStorage struct {
-	data map[string]any
+	Data map[string]any
 }
 
 func (m MemStorage) AddGauge(name string, value float64) {
 	// новое значение должно замещать предыдущее
-	m.data[name] = value
+	m.Data[name] = value
 }
 
 func (m MemStorage) CheckGaugeType(name string) bool {
-	val, ok := m.data[name]
+	val, ok := m.Data[name]
 	_, okType := val.(float64)
 	if ok && okType {
 		return true
@@ -20,16 +20,16 @@ func (m MemStorage) CheckGaugeType(name string) bool {
 
 func (m MemStorage) AddCounter(name string, value int64) {
 	// новое значение должно добавляться к предыдущему
-	oldValue, ok := m.data[name].(int64)
+	oldValue, ok := m.Data[name].(int64)
 	if ok {
-		m.data[name] = oldValue + value
+		m.Data[name] = oldValue + value
 	} else {
-		m.data[name] = value
+		m.Data[name] = value
 	}
 }
 
 func (m MemStorage) CheckCounterType(name string) bool {
-	val, ok := m.data[name]
+	val, ok := m.Data[name]
 	_, okType := val.(int64)
 	if ok && okType {
 		return true
@@ -37,8 +37,16 @@ func (m MemStorage) CheckCounterType(name string) bool {
 	return false
 }
 
+func (m MemStorage) GetTypeValue(name string) any {
+	val, ok := m.Data[name]
+	if !ok {
+		return nil
+	}
+	return val
+}
+
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
-		data: make(map[string]any),
+		Data: make(map[string]any),
 	}
 }
