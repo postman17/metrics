@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -28,9 +29,11 @@ func SendGaugeData(client http.Client, config Config, name string, data float64)
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error:", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-	return resp, err
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp, nil
 }
 
 func SendCounterData(client http.Client, config Config, name string, data int64) (*http.Response, error) {
@@ -49,9 +52,11 @@ func SendCounterData(client http.Client, config Config, name string, data int64)
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error:", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-	return resp, err
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp, nil
 }
 
 func main() {

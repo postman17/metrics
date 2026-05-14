@@ -89,12 +89,11 @@ func GetMetricValue(memory *mem.MemStorage) http.HandlerFunc {
 			}
 		}
 
+		rw.WriteHeader(http.StatusOK)
 		enc := json.NewEncoder(rw)
 		if err := enc.Encode(resp); err != nil {
 			slog.Info("error encoding response")
 			return
 		}
-
-		rw.WriteHeader(http.StatusOK)
 	}
 }
