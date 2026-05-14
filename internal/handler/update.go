@@ -104,6 +104,7 @@ func UpdateMetric(memory *mem.MemStorage) http.HandlerFunc {
 		}
 
 		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte("{}"))
 		fmt.Println(memory)
 	}
 }
