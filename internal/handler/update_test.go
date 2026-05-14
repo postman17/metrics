@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -190,5 +191,92 @@ func TestUpdateHandlerErrors(t *testing.T) {
 		_, err := io.ReadAll(res.Body)
 
 		require.NoError(t, err)
+	}
+}
+
+func TestUpdateMetric(t *testing.T) {
+	memory := repo.NewMemStorage()
+	handler := http.HandlerFunc(UpdateMetric(memory))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	testCases := []struct {
+		name         string
+		method       string
+		body         string
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "method_get",
+			method:       http.MethodGet,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_put",
+			method:       http.MethodPut,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_delete",
+			method:       http.MethodDelete,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+		},
+		{
+			name:         "method_post_without_body",
+			method:       http.MethodPost,
+			expectedCode: http.StatusInternalServerError,
+			expectedBody: "",
+		},
+		{
+			name:         "method_post_without_value",
+			method:       http.MethodPost,
+			body:         `{"id": "test", "type": "gauge"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "",
+		},
+		{
+			name:         "method_post_success",
+			method:       http.MethodPost,
+			body:         `{"id": "test", "type": "gauge", "value": 1.6}`,
+			expectedCode: http.StatusOK,
+			expectedBody: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var bodyReader io.Reader
+			if tc.body != "" {
+				bodyReader = bytes.NewBufferString(tc.body)
+			}
+
+			req, err := http.NewRequest(tc.method, srv.URL+"/update", bodyReader)
+			if err != nil {
+				t.Fatalf("Не удалось создать запрос: %v", err)
+			}
+
+			if tc.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+
+			resp, err := srv.Client().Do(req)
+			if !assert.NoError(t, err, "error making HTTP request") {
+				return
+			}
+			defer resp.Body.Close()
+
+			assert.Equal(t, tc.expectedCode, resp.StatusCode, "Response code didn't match expected")
+
+			respBody, err := io.ReadAll(resp.Body)
+			assert.NoError(t, err, "error reading response body")
+
+			if tc.expectedBody != "" {
+				assert.JSONEq(t, tc.expectedBody, string(respBody))
+			}
+		})
 	}
 }

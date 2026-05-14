@@ -1,16 +1,31 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
 	"time"
+
+	models "github.com/postman17/metrics/internal/model"
 )
 
 func SendGaugeData(client http.Client, config Config, name string, data float64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update/gauge/%s/%v", config.RunAddr, name, data)
-	resp, err := client.Post(url, "text/plain", nil)
+	url := fmt.Sprintf("%s/update", config.RunAddr)
+	metric := models.Metrics{
+		ID:    name,
+		MType: "gauge",
+		Value: &data,
+	}
+
+	jsonData, err := json.Marshal(metric)
+	if err != nil {
+		fmt.Printf("Marshal error: %v\n", err)
+		return nil, err
+	}
+	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
@@ -19,8 +34,19 @@ func SendGaugeData(client http.Client, config Config, name string, data float64)
 }
 
 func SendCounterData(client http.Client, config Config, name string, data int64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update/counter/%s/%v", config.RunAddr, name, data)
-	resp, err := client.Post(url, "text/plain", nil)
+	url := fmt.Sprintf("%s/update", config.RunAddr)
+	metric := models.Metrics{
+		ID:    name,
+		MType: "counter",
+		Delta: &data,
+	}
+
+	jsonData, err := json.Marshal(metric)
+	if err != nil {
+		fmt.Printf("Marshal error: %v\n", err)
+		return nil, err
+	}
+	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
