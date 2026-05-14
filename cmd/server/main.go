@@ -19,9 +19,9 @@ func main() {
 	r.Use(log.WithLogging)
 
 	r.Get("/", handlers.GetMainPage(memory))
-	r.Post("/update", handlers.UpdateMetric(memory))
+	r.Post("/update/", handlers.UpdateMetric(memory))
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(memory))
-	r.Post("/value", handlers.GetMetricValue(memory))
+	r.Post("/value/", handlers.GetMetricValue(memory))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(memory))
 
 	err := http.ListenAndServe(config.RunAddr, r)

@@ -13,7 +13,7 @@ import (
 )
 
 func SendGaugeData(client http.Client, config Config, name string, data float64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update", config.RunAddr)
+	url := fmt.Sprintf("%s/update/", config.RunAddr)
 	metric := models.Metrics{
 		ID:    name,
 		MType: "gauge",
@@ -34,7 +34,7 @@ func SendGaugeData(client http.Client, config Config, name string, data float64)
 }
 
 func SendCounterData(client http.Client, config Config, name string, data int64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update", config.RunAddr)
+	url := fmt.Sprintf("%s/update/", config.RunAddr)
 	metric := models.Metrics{
 		ID:    name,
 		MType: "counter",
