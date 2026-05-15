@@ -1,11 +1,12 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
+	"github.com/mailru/easyjson"
 	models "github.com/postman17/metrics/internal/model"
 	mem "github.com/postman17/metrics/internal/repository"
 )
@@ -68,10 +69,16 @@ func UpdateMetric(memory *mem.MemStorage) http.HandlerFunc {
 			return
 		}
 
-		var req models.Metrics
-		dec := json.NewDecoder(r.Body)
-		if err := dec.Decode(&req); err != nil {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer r.Body.Close()
+
+		var req models.Metrics
+		if err := easyjson.Unmarshal(body, &req); err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		metricType := req.MType

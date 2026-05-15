@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -10,6 +9,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/mailru/easyjson"
 	models "github.com/postman17/metrics/internal/model"
 )
 
@@ -21,7 +21,7 @@ func SendGaugeData(client http.Client, config Config, name string, data float64)
 		Value: &data,
 	}
 
-	jsonData, err := json.Marshal(metric)
+	jsonData, err := easyjson.Marshal(metric)
 	if err != nil {
 		fmt.Printf("Marshal error: %v\n", err)
 		return nil, err
@@ -44,7 +44,7 @@ func SendCounterData(client http.Client, config Config, name string, data int64)
 		Delta: &data,
 	}
 
-	jsonData, err := json.Marshal(metric)
+	jsonData, err := easyjson.Marshal(metric)
 	if err != nil {
 		fmt.Printf("Marshal error: %v\n", err)
 		return nil, err
