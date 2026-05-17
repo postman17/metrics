@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
 	repo "github.com/postman17/metrics/internal/repository"
@@ -17,6 +18,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
+	r.Use(gzip.GZIPMiddleware)
 
 	r.Get("/", handlers.GetMainPage(memory))
 	r.Post("/update/", handlers.UpdateMetric(memory))

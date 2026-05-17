@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
-	"io"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -13,6 +13,44 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+func SendRequest(client http.Client, metric models.Metrics, url string) (*http.Response, error) {
+	jsonData, err := easyjson.Marshal(metric)
+	if err != nil {
+		fmt.Printf("Marshal error: %v\n", err)
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	_, err = gzWriter.Write(jsonData)
+	if err != nil {
+		fmt.Printf("Gzip error: %v\n", err)
+		return nil, err
+	}
+	if err := gzWriter.Close(); err != nil {
+		fmt.Printf("Error gzip compress: %v\n", err)
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		fmt.Printf("Create request error: %v\n", err)
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Send request error: %v\n", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return resp, nil
+}
+
 func SendGaugeData(client http.Client, config Config, name string, data float64) (*http.Response, error) {
 	url := fmt.Sprintf("%s/update/", config.RunAddr)
 	metric := models.Metrics{
@@ -21,19 +59,7 @@ func SendGaugeData(client http.Client, config Config, name string, data float64)
 		Value: &data,
 	}
 
-	jsonData, err := easyjson.Marshal(metric)
-	if err != nil {
-		fmt.Printf("Marshal error: %v\n", err)
-		return nil, err
-	}
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		fmt.Println("Error:", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
-	return resp, nil
+	return SendRequest(client, metric, url)
 }
 
 func SendCounterData(client http.Client, config Config, name string, data int64) (*http.Response, error) {
@@ -44,19 +70,7 @@ func SendCounterData(client http.Client, config Config, name string, data int64)
 		Delta: &data,
 	}
 
-	jsonData, err := easyjson.Marshal(metric)
-	if err != nil {
-		fmt.Printf("Marshal error: %v\n", err)
-		return nil, err
-	}
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		fmt.Println("Error:", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
-	return resp, nil
+	return SendRequest(client, metric, url)
 }
 
 func main() {
