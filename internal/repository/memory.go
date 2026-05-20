@@ -19,8 +19,8 @@ type MemStorage struct {
 }
 
 func (m *MemStorage) AddGauge(name string, value float64) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	// новое значение должно замещать предыдущее
 	m.Data[name] = value
 }
@@ -35,8 +35,8 @@ func (m *MemStorage) CheckGaugeType(name string) bool {
 }
 
 func (m *MemStorage) AddCounter(name string, value int64) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	// новое значение должно добавляться к предыдущему
 	oldValue, ok := m.Data[name].(int64)
 	if ok {
