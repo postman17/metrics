@@ -73,6 +73,10 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
+	if err := memory.SaveToFile(); err != nil {
+		slog.Error("memory save to file failed", "err", err)
+	}
+
 	cancel()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -80,9 +84,5 @@ func main() {
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server shutdown failed", "err", err)
-	}
-
-	if err := memory.SaveToFile(); err != nil {
-		slog.Error("memory save to file failed", "err", err)
 	}
 }

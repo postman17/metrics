@@ -19,33 +19,38 @@ func parseFlags() Config {
 	if err := env.Parse(&cfg); err != nil {
 		fmt.Println("Error:", err)
 	}
-	var (
-		runAddr         string = cfg.RunAddr
-		storeInterval   int64
-		fileStoragePath string = cfg.FileStoragePath
-		restore         bool
-	)
-	if cfg.RunAddr == "" {
+	runAddr := cfg.RunAddr
+	if runAddr == "" {
 		flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 		flag.Parse()
 	}
-	if cfg.StoreInterval == nil {
+
+	storeInterval := int64(300)
+	if cfg.StoreInterval != nil {
+		storeInterval = *cfg.StoreInterval
+	} else {
 		flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
 		flag.Parse()
 	}
-	if cfg.FileStoragePath == "" {
+
+	fileStoragePath := cfg.FileStoragePath
+	if fileStoragePath == "" {
 		flag.StringVar(&fileStoragePath, "f", "./file.json", "file storage path")
 		flag.Parse()
 	}
-	if cfg.Restore == nil {
+
+	restore := false
+	if cfg.Restore != nil {
+		restore = *cfg.Restore
+	} else {
 		flag.BoolVar(&restore, "r", false, "load previous values")
 		flag.Parse()
 	}
-	config := Config{
+
+	return Config{
 		RunAddr:         runAddr,
 		StoreInterval:   &storeInterval,
 		FileStoragePath: fileStoragePath,
 		Restore:         &restore,
 	}
-	return config
 }
