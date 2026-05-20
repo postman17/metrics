@@ -1,7 +1,9 @@
 package main
 
 import (
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	gzip "github.com/postman17/metrics/internal/gzip"
@@ -14,7 +16,26 @@ func main() {
 	log.InitializeLogger("INFO")
 	config := parseFlags()
 
-	memory := repo.NewMemStorage()
+	storeNotSync := *config.StoreInterval > 0
+	memory := repo.NewMemStorage(storeNotSync, config.FileStoragePath)
+	if *config.Restore {
+		memory.LoadFromFile()
+	}
+
+	if storeNotSync {
+		go func() {
+			ticker := time.NewTicker(time.Duration(*config.StoreInterval) * time.Second)
+			defer ticker.Stop()
+
+			for range ticker.C {
+				if err := memory.SaveToFile(); err != nil {
+					slog.Error(
+						"memory save to file failed", "err", err,
+					)
+				}
+			}
+		}()
+	}
 
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)

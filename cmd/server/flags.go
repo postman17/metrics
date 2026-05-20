@@ -8,7 +8,10 @@ import (
 )
 
 type Config struct {
-	RunAddr string `env:"ADDRESS"`
+	RunAddr         string `env:"ADDRESS"`
+	StoreInterval   *int64 `env:"STORE_INTERVAL"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH"`
+	Restore         *bool  `env:"RESTORE"`
 }
 
 func parseFlags() Config {
@@ -17,15 +20,32 @@ func parseFlags() Config {
 		fmt.Println("Error:", err)
 	}
 	var (
-		runAddr string = cfg.RunAddr
+		runAddr         string = cfg.RunAddr
+		storeInterval   int64
+		fileStoragePath string = cfg.FileStoragePath
+		restore         bool
 	)
 	if cfg.RunAddr == "" {
-		flag.StringVar(&runAddr, "a", "", "address and port to run server")
+		flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 		flag.Parse()
 	}
-	if runAddr == "" {
-		runAddr = "localhost:8080"
+	if cfg.StoreInterval == nil {
+		flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
+		flag.Parse()
 	}
-	config := Config{RunAddr: runAddr}
+	if cfg.FileStoragePath == "" {
+		flag.StringVar(&fileStoragePath, "f", "./file.json", "file storage path")
+		flag.Parse()
+	}
+	if cfg.Restore == nil {
+		flag.BoolVar(&restore, "r", false, "load previous values")
+		flag.Parse()
+	}
+	config := Config{
+		RunAddr:         runAddr,
+		StoreInterval:   &storeInterval,
+		FileStoragePath: fileStoragePath,
+		Restore:         &restore,
+	}
 	return config
 }

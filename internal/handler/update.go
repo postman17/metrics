@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -53,6 +54,14 @@ func UpdateMetricPage(memory *mem.MemStorage) http.HandlerFunc {
 				return
 			}
 			memory.AddCounter(metricName, value)
+		}
+
+		if !memory.StoreNotSync {
+			if err := memory.SaveToFile(); err != nil {
+				slog.Error(
+					"memory save to file failed", "err", err,
+				)
+			}
 		}
 
 		rw.Header().Set("Content-Type", "text/plain")
@@ -108,6 +117,14 @@ func UpdateMetric(memory *mem.MemStorage) http.HandlerFunc {
 				return
 			}
 			memory.AddCounter(metricName, *metricCounterValue)
+		}
+
+		if !memory.StoreNotSync {
+			if err := memory.SaveToFile(); err != nil {
+				slog.Error(
+					"memory save to file failed", "err", err,
+				)
+			}
 		}
 
 		rw.WriteHeader(http.StatusOK)
