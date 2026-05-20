@@ -14,7 +14,7 @@ import (
 )
 
 func TestGzipCompression(t *testing.T) {
-	memory := repo.NewMemStorage()
+	memory := repo.NewMemStorage(true, "")
 	handler := GZIPMiddleware(handlers.UpdateMetric(memory))
 
 	srv := httptest.NewServer(handler)
