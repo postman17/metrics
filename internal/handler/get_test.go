@@ -55,7 +55,7 @@ func TestGetValueHandlerSuccess(t *testing.T) {
 		request.SetPathValue("type", tt.want.metricType)
 		request.SetPathValue("name", tt.want.metricName)
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage(true, "")
+		memory := repo.NewMemStorage(true, "", false)
 		memory.Data = tt.data
 		GetMetricValuePage(memory)(w, request)
 		res := w.Result()
@@ -117,7 +117,7 @@ func TestGetValueHandlerErrors(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage(true, "")
+		memory := repo.NewMemStorage(true, "", false)
 		memory.Data = tt.data
 		GetMetricValuePage(memory)(w, request)
 
@@ -132,7 +132,7 @@ func TestGetValueHandlerErrors(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
-	memory := repo.NewMemStorage(true, "")
+	memory := repo.NewMemStorage(true, "", false)
 	handler := http.HandlerFunc(GetMetricValue(memory))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -176,7 +176,7 @@ func TestGetMetric(t *testing.T) {
 		{
 			name:         "method_post_without_body",
 			method:       http.MethodPost,
-			expectedCode: http.StatusInternalServerError,
+			expectedCode: http.StatusBadRequest,
 			expectedBody: "",
 			hasMem:       false,
 		},

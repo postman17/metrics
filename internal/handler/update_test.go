@@ -81,7 +81,7 @@ func TestUpdateHandlerSuccess(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 		request.SetPathValue("value", tt.want.metricValue)
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage(true, "")
+		memory := repo.NewMemStorage(true, "", false)
 		memory.Data = tt.data
 		UpdateMetricPage(memory)(w, request)
 
@@ -180,7 +180,7 @@ func TestUpdateHandlerErrors(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 		request.SetPathValue("value", tt.want.metricValue)
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage(true, "")
+		memory := repo.NewMemStorage(true, "", false)
 		memory.Data = tt.data
 		UpdateMetricPage(memory)(w, request)
 
@@ -195,7 +195,7 @@ func TestUpdateHandlerErrors(t *testing.T) {
 }
 
 func TestUpdateMetric(t *testing.T) {
-	memory := repo.NewMemStorage(true, "")
+	memory := repo.NewMemStorage(true, "", false)
 	handler := http.HandlerFunc(UpdateMetric(memory))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()

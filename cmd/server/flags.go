@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log/slog"
 
 	"github.com/caarlos0/env/v11"
 )
@@ -15,36 +15,34 @@ type Config struct {
 }
 
 func parseFlags() Config {
+	var (
+		runAddr         string
+		storeInterval   int64
+		fileStoragePath string
+		restore         bool
+	)
+	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
+	flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
+	flag.StringVar(&fileStoragePath, "f", "./file.json", "file storage path")
+	flag.BoolVar(&restore, "r", false, "load previous values")
+	flag.Parse()
+
 	cfg := Config{}
 	if err := env.Parse(&cfg); err != nil {
-		fmt.Println("Error:", err)
-	}
-	runAddr := cfg.RunAddr
-	if runAddr == "" {
-		flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
-		flag.Parse()
+		slog.Error("Error parse envs:", "error", err)
 	}
 
-	storeInterval := int64(300)
+	if cfg.RunAddr != "" {
+		runAddr = cfg.RunAddr
+	}
 	if cfg.StoreInterval != nil {
 		storeInterval = *cfg.StoreInterval
-	} else {
-		flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
-		flag.Parse()
 	}
-
-	fileStoragePath := cfg.FileStoragePath
-	if fileStoragePath == "" {
-		flag.StringVar(&fileStoragePath, "f", "./file.json", "file storage path")
-		flag.Parse()
+	if cfg.FileStoragePath != "" {
+		fileStoragePath = cfg.FileStoragePath
 	}
-
-	restore := false
 	if cfg.Restore != nil {
 		restore = *cfg.Restore
-	} else {
-		flag.BoolVar(&restore, "r", false, "load previous values")
-		flag.Parse()
 	}
 
 	return Config{

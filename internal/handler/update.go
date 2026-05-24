@@ -56,17 +56,9 @@ func UpdateMetricPage(memory *mem.MemStorage) http.HandlerFunc {
 			memory.AddCounter(metricName, value)
 		}
 
-		if !memory.StoreNotSync {
-			if err := memory.SaveToFile(); err != nil {
-				slog.Error(
-					"memory save to file failed", "err", err,
-				)
-			}
-		}
-
 		rw.Header().Set("Content-Type", "text/plain")
 		rw.WriteHeader(http.StatusOK)
-		fmt.Println(memory)
+		slog.Debug("update metric page", "memory", memory)
 	}
 }
 
@@ -119,16 +111,8 @@ func UpdateMetric(memory *mem.MemStorage) http.HandlerFunc {
 			memory.AddCounter(metricName, *metricCounterValue)
 		}
 
-		if !memory.StoreNotSync {
-			if err := memory.SaveToFile(); err != nil {
-				slog.Error(
-					"memory save to file failed", "err", err,
-				)
-			}
-		}
-
 		rw.WriteHeader(http.StatusOK)
 		_, _ = rw.Write([]byte("{}"))
-		fmt.Println(memory)
+		slog.Debug("update metric", "memory", memory)
 	}
 }

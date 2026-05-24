@@ -2,16 +2,16 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/caarlos0/env/v11"
 )
 
 type Config struct {
-	ReportInterval int64  `env:"REPORT_INTERVAL" envDefault:"10"`
-	PollInterval   int64  `env:"POLL_INTERVAL" envDefault:"2"`
-	RunAddr        string `env:"ADDRESS" envDefault:"http://localhost:8080"`
+	ReportInterval int64  `env:"REPORT_INTERVAL"`
+	PollInterval   int64  `env:"POLL_INTERVAL"`
+	RunAddr        string `env:"ADDRESS"`
 }
 
 func addPrefix(s string) string {
@@ -22,25 +22,34 @@ func addPrefix(s string) string {
 }
 
 func parseFlags() Config {
-	cfg := Config{}
-	if err := env.Parse(&cfg); err != nil {
-		fmt.Println("Error:", err)
-	}
 	var (
 		reportInterval int64
 		pollInterval   int64
 		runAddr        string
 	)
-	flag.StringVar(&runAddr, "a", cfg.RunAddr, "address and port to run server")
-	flag.Int64Var(&reportInterval, "r", cfg.ReportInterval, "reportInterval")
-	flag.Int64Var(&pollInterval, "p", cfg.PollInterval, "pollInterval")
+
+	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
+	flag.Int64Var(&reportInterval, "r", 10, "reportInterval")
+	flag.Int64Var(&pollInterval, "p", 2, "pollInterval")
 	flag.Parse()
 
-	config := Config{
+	cfg := Config{}
+	if err := env.Parse(&cfg); err != nil {
+		slog.Error("Error parse envs:", "error", err)
+	}
+	if cfg.RunAddr != "" {
+		runAddr = cfg.RunAddr
+	}
+	if cfg.ReportInterval != 0 {
+		reportInterval = cfg.ReportInterval
+	}
+	if cfg.PollInterval != 0 {
+		pollInterval = cfg.PollInterval
+	}
+
+	return Config{
 		ReportInterval: reportInterval,
 		PollInterval:   pollInterval,
 		RunAddr:        addPrefix(runAddr),
 	}
-
-	return config
 }

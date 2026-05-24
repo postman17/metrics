@@ -1,5 +1,5 @@
-install-easyjson:
-	go get github.com/mailru/easyjson && go install github.com/mailru/easyjson/...@latest
+tools:
+	go get -tool github.com/mailru/easyjson/easyjson@v0.9.2
 
 generate:
 	go generate ./...

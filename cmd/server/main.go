@@ -17,21 +17,19 @@ import (
 )
 
 func main() {
-	log.InitializeLogger("INFO")
+	if err := log.InitializeLogger("INFO"); err != nil {
+		slog.Error("failed to initialize logger", "err", err)
+		os.Exit(1)
+	}
 	config := parseFlags()
 
-	storeNotSync := *config.StoreInterval > 0
-	memory := repo.NewMemStorage(storeNotSync, config.FileStoragePath)
-	if *config.Restore {
-		if err := memory.LoadFromFile(); err != nil {
-			slog.Error("memory load from file failed", "err", err)
-		}
-	}
+	storeSync := *config.StoreInterval == 0
+	memory := repo.NewMemStorage(storeSync, config.FileStoragePath, *config.Restore)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	if storeNotSync {
+	if !storeSync {
 		go func() {
 			ticker := time.NewTicker(time.Duration(*config.StoreInterval) * time.Second)
 			defer ticker.Stop()
@@ -65,7 +63,8 @@ func main() {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			panic(err)
+			slog.Error("failed to start http server", "err", err)
+			os.Exit(1)
 		}
 	}()
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"log/slog"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
@@ -24,17 +25,17 @@ func SendRequest(client http.Client, metric models.Metrics, url string) (*http.R
 	gzWriter := gzip.NewWriter(&buf)
 	_, err = gzWriter.Write(jsonData)
 	if err != nil {
-		fmt.Printf("Gzip error: %v\n", err)
+		slog.Error("Gzip error: %v\n", "err", err)
 		return nil, err
 	}
 	if err := gzWriter.Close(); err != nil {
-		fmt.Printf("Error gzip compress: %v\n", err)
+		slog.Error("Error gzip compress: %v\n", "err", err)
 		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf.Bytes()))
 	if err != nil {
-		fmt.Printf("Create request error: %v\n", err)
+		slog.Error("Create request error: %v\n", "err", err)
 		return nil, err
 	}
 
@@ -88,7 +89,7 @@ func main() {
 		select {
 		case t1 := <-tickerPoll.C:
 			runtime.ReadMemStats(&m)
-			fmt.Println("Fast tic:", t1)
+			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
 			SendGaugeData(*client, config, "Alloc", float64(m.Alloc))
 			SendGaugeData(*client, config, "BuckHashSys", float64(m.BuckHashSys))
@@ -119,7 +120,7 @@ func main() {
 			SendGaugeData(*client, config, "TotalAlloc", float64(m.TotalAlloc))
 			SendGaugeData(*client, config, "RandomValue", rand.Float64())
 			SendCounterData(*client, config, "PollCount", 1)
-			fmt.Println("Slow tic:", t2)
+			slog.Info("Slow tic:", "time", t2)
 		}
 	}
 }

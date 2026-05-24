@@ -12,20 +12,30 @@ import (
 )
 
 type MemStorage struct {
-	Data         map[string]any
-	StoreNotSync bool
-	FilePath     string
-	mu           sync.RWMutex
+	Data      map[string]any
+	StoreSync bool
+	FilePath  string
+	mu        sync.Mutex
 }
 
 func (m *MemStorage) AddGauge(name string, value float64) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	// новое значение должно замещать предыдущее
 	m.Data[name] = value
+	storeSync := m.StoreSync
+	m.mu.Unlock()
+
+	if storeSync {
+		if err := m.SaveToFile(); err != nil {
+			slog.Error(
+				"memory save to file failed", "err", err,
+			)
+		}
+	}
 }
 
 func (m *MemStorage) CheckGaugeType(name string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	val, ok := m.Data[name]
 	_, okType := val.(float64)
 	if ok && okType {
@@ -36,7 +46,6 @@ func (m *MemStorage) CheckGaugeType(name string) bool {
 
 func (m *MemStorage) AddCounter(name string, value int64) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	// новое значение должно добавляться к предыдущему
 	oldValue, ok := m.Data[name].(int64)
 	if ok {
@@ -44,9 +53,21 @@ func (m *MemStorage) AddCounter(name string, value int64) {
 	} else {
 		m.Data[name] = value
 	}
+	storeSync := m.StoreSync
+	m.mu.Unlock()
+
+	if storeSync {
+		if err := m.SaveToFile(); err != nil {
+			slog.Error(
+				"memory save to file failed", "err", err,
+			)
+		}
+	}
 }
 
 func (m *MemStorage) CheckCounterType(name string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	val, ok := m.Data[name]
 	_, okType := val.(int64)
 	if ok && okType {
@@ -56,8 +77,8 @@ func (m *MemStorage) CheckCounterType(name string) bool {
 }
 
 func (m *MemStorage) GetTypeValue(name string) any {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	val, ok := m.Data[name]
 	if !ok {
 		return nil
@@ -70,11 +91,10 @@ func (m *MemStorage) LoadFromFile() error {
 		return fmt.Errorf("path to storage file is empty")
 	}
 
-	if _, err := os.Stat(m.FilePath); os.IsNotExist(err) {
+	data, err := os.ReadFile(m.FilePath)
+	if os.IsNotExist(err) {
 		return nil
 	}
-
-	data, err := os.ReadFile(m.FilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
@@ -104,7 +124,7 @@ func (m *MemStorage) LoadFromFile() error {
 }
 
 func (m *MemStorage) SaveToFile() error {
-	m.mu.RLock()
+	m.mu.Lock()
 	list := make(models.MetricsList, 0, len(m.Data))
 
 	for id, v := range m.Data {
@@ -125,7 +145,7 @@ func (m *MemStorage) SaveToFile() error {
 			})
 		}
 	}
-	m.mu.RUnlock()
+	m.mu.Unlock()
 
 	data, err := easyjson.Marshal(list)
 	if err != nil {
@@ -152,10 +172,16 @@ func (m *MemStorage) SaveToFile() error {
 	return nil
 }
 
-func NewMemStorage(storeNotSync bool, filePath string) *MemStorage {
-	return &MemStorage{
-		Data:         make(map[string]any),
-		StoreNotSync: storeNotSync,
-		FilePath:     filePath,
+func NewMemStorage(storeSync bool, filePath string, restore bool) *MemStorage {
+	mem := MemStorage{
+		Data:      make(map[string]any),
+		StoreSync: storeSync,
+		FilePath:  filePath,
 	}
+	if restore {
+		if err := mem.LoadFromFile(); err != nil {
+			slog.Error("memory load from file failed", "err", err)
+		}
+	}
+	return &mem
 }

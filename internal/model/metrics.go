@@ -1,4 +1,4 @@
-//go:generate easyjson -all metrics.go
+//go:generate go tool easyjson -all metrics.go
 package models
 
 const (

@@ -38,16 +38,9 @@ func GetMetricValuePage(memory *mem.MemStorage) http.HandlerFunc {
 			rw.Write([]byte(fmt.Sprintf("%d", value)))
 		}
 
-		if !memory.StoreNotSync {
-			if err := memory.SaveToFile(); err != nil {
-				slog.Error(
-					"memory save to file failed", "err", err,
-				)
-			}
-		}
 		rw.Header().Set("Content-Type", "text/plain")
 		rw.WriteHeader(http.StatusOK)
-		fmt.Println(memory)
+		slog.Debug("get metric value page", "memory", memory)
 	}
 }
 
@@ -62,7 +55,7 @@ func GetMetricValue(memory *mem.MemStorage) http.HandlerFunc {
 		var req models.GetMetricRequest
 		dec := json.NewDecoder(r.Body)
 		if err := dec.Decode(&req); err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
+			rw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		metricType := req.MType
@@ -97,13 +90,6 @@ func GetMetricValue(memory *mem.MemStorage) http.HandlerFunc {
 			}
 		}
 
-		if !memory.StoreNotSync {
-			if err := memory.SaveToFile(); err != nil {
-				slog.Error(
-					"memory save to file failed", "err", err,
-				)
-			}
-		}
 		rw.WriteHeader(http.StatusOK)
 		enc := json.NewEncoder(rw)
 		if err := enc.Encode(resp); err != nil {
