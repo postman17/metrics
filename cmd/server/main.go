@@ -67,7 +67,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(memory))
 	r.Post("/value/", handlers.GetMetricValue(memory))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(memory))
-	r.Get("/ping/", handlers.Ping(DB))
+	r.Get("/ping", handlers.Ping(DB))
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
