@@ -1,38 +1,84 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"log/slog"
 	"math/rand/v2"
 	"net/http"
 	"runtime"
 	"time"
+
+	"github.com/mailru/easyjson"
+	models "github.com/postman17/metrics/internal/model"
 )
 
-func SendGaugeData(client http.Client, config Config, name string, data float64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update/gauge/%s/%v", config.runAddr, name, data)
-	resp, err := client.Post(url, "text/plain", nil)
+func SendRequest(client http.Client, metric models.Metrics, url string) (*http.Response, error) {
+	jsonData, err := easyjson.Marshal(metric)
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Printf("Marshal error: %v\n", err)
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	_, err = gzWriter.Write(jsonData)
+	if err != nil {
+		slog.Error("Gzip error: %v\n", "err", err)
+		return nil, err
+	}
+	if err := gzWriter.Close(); err != nil {
+		slog.Error("Error gzip compress: %v\n", "err", err)
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		slog.Error("Create request error: %v\n", "err", err)
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Accept-Encoding", "gzip")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Send request error: %v\n", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
-	return resp, err
+	return resp, nil
+}
+
+func SendGaugeData(client http.Client, config Config, name string, data float64) (*http.Response, error) {
+	url := fmt.Sprintf("%s/update/", config.RunAddr)
+	metric := models.Metrics{
+		ID:    name,
+		MType: "gauge",
+		Value: &data,
+	}
+
+	return SendRequest(client, metric, url)
 }
 
 func SendCounterData(client http.Client, config Config, name string, data int64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update/counter/%s/%v", config.runAddr, name, data)
-	resp, err := client.Post(url, "text/plain", nil)
-	if err != nil {
-		fmt.Println("Error:", err)
+	url := fmt.Sprintf("%s/update/", config.RunAddr)
+	metric := models.Metrics{
+		ID:    name,
+		MType: "counter",
+		Delta: &data,
 	}
-	defer resp.Body.Close()
-	return resp, err
+
+	return SendRequest(client, metric, url)
 }
 
 func main() {
 	config := parseFlags()
 
-	tickerPoll := time.NewTicker(time.Duration(config.pollInterval) * time.Second)
-	tickerReport := time.NewTicker(time.Duration(config.reportInterval) * time.Second)
+	tickerPoll := time.NewTicker(time.Duration(config.PollInterval) * time.Second)
+	tickerReport := time.NewTicker(time.Duration(config.ReportInterval) * time.Second)
 	defer tickerPoll.Stop()
 	defer tickerReport.Stop()
 	client := &http.Client{
@@ -43,7 +89,7 @@ func main() {
 		select {
 		case t1 := <-tickerPoll.C:
 			runtime.ReadMemStats(&m)
-			fmt.Println("Fast tic:", t1)
+			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
 			SendGaugeData(*client, config, "Alloc", float64(m.Alloc))
 			SendGaugeData(*client, config, "BuckHashSys", float64(m.BuckHashSys))
@@ -74,7 +120,7 @@ func main() {
 			SendGaugeData(*client, config, "TotalAlloc", float64(m.TotalAlloc))
 			SendGaugeData(*client, config, "RandomValue", rand.Float64())
 			SendCounterData(*client, config, "PollCount", 1)
-			fmt.Println("Slow tic:", t2)
+			slog.Info("Slow tic:", "time", t2)
 		}
 	}
 }

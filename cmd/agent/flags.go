@@ -2,45 +2,54 @@ package main
 
 import (
 	"flag"
+	"log/slog"
 	"strings"
+
+	"github.com/caarlos0/env/v11"
 )
 
-type httpAddr string
 type Config struct {
-	reportInterval int64
-	pollInterval   int64
-	runAddr        httpAddr
+	ReportInterval int64  `env:"REPORT_INTERVAL"`
+	PollInterval   int64  `env:"POLL_INTERVAL"`
+	RunAddr        string `env:"ADDRESS"`
 }
 
-func (h *httpAddr) Set(s string) error {
+func addPrefix(s string) string {
 	if !strings.HasPrefix(s, "http://") && !strings.HasPrefix(s, "https://") {
 		s = "http://" + s
 	}
-	*h = httpAddr(s)
-	return nil
-}
-
-func (h *httpAddr) String() string {
-	return string(*h)
+	return s
 }
 
 func parseFlags() Config {
 	var (
 		reportInterval int64
 		pollInterval   int64
-		runAddr        httpAddr = "http://localhost:8080"
+		runAddr        string
 	)
 
-	flag.Var(&runAddr, "a", "address and port to run server")
+	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 	flag.Int64Var(&reportInterval, "r", 10, "reportInterval")
 	flag.Int64Var(&pollInterval, "p", 2, "pollInterval")
 	flag.Parse()
 
-	config := Config{
-		reportInterval: reportInterval,
-		pollInterval:   pollInterval,
-		runAddr:        runAddr,
+	cfg := Config{}
+	if err := env.Parse(&cfg); err != nil {
+		slog.Error("Error parse envs:", "error", err)
+	}
+	if cfg.RunAddr != "" {
+		runAddr = cfg.RunAddr
+	}
+	if cfg.ReportInterval != 0 {
+		reportInterval = cfg.ReportInterval
+	}
+	if cfg.PollInterval != 0 {
+		pollInterval = cfg.PollInterval
 	}
 
-	return config
+	return Config{
+		ReportInterval: reportInterval,
+		PollInterval:   pollInterval,
+		RunAddr:        addPrefix(runAddr),
+	}
 }

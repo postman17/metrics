@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -54,7 +55,7 @@ func TestGetValueHandlerSuccess(t *testing.T) {
 		request.SetPathValue("type", tt.want.metricType)
 		request.SetPathValue("name", tt.want.metricName)
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage()
+		memory := repo.NewMemStorage(true, "", false)
 		memory.Data = tt.data
 		GetMetricValuePage(memory)(w, request)
 		res := w.Result()
@@ -116,7 +117,7 @@ func TestGetValueHandlerErrors(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage()
+		memory := repo.NewMemStorage(true, "", false)
 		memory.Data = tt.data
 		GetMetricValuePage(memory)(w, request)
 
@@ -127,5 +128,123 @@ func TestGetValueHandlerErrors(t *testing.T) {
 		_, err := io.ReadAll(res.Body)
 
 		require.NoError(t, err)
+	}
+}
+
+func TestGetMetric(t *testing.T) {
+	memory := repo.NewMemStorage(true, "", false)
+	handler := http.HandlerFunc(GetMetricValue(memory))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+	type mem struct {
+		metricName  string
+		metricValue float64
+	}
+	testCases := []struct {
+		name         string
+		method       string
+		body         string
+		expectedCode int
+		expectedBody string
+		hasMem       bool
+		mem          mem
+	}{
+		{
+			name:         "method_get",
+			method:       http.MethodGet,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+			hasMem:       false,
+			mem:          mem{},
+		},
+		{
+			name:         "method_put",
+			method:       http.MethodPut,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+			hasMem:       false,
+			mem:          mem{},
+		},
+		{
+			name:         "method_delete",
+			method:       http.MethodDelete,
+			expectedCode: http.StatusMethodNotAllowed,
+			expectedBody: "",
+			hasMem:       false,
+			mem:          mem{},
+		},
+		{
+			name:         "method_post_without_body",
+			method:       http.MethodPost,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "",
+			hasMem:       false,
+		},
+		{
+			name:         "method_post_without_value",
+			method:       http.MethodPost,
+			body:         `{"id": "test"}`,
+			expectedCode: http.StatusNotFound,
+			expectedBody: "",
+			hasMem:       false,
+			mem:          mem{},
+		},
+		{
+			name:         "method_post_not_type",
+			method:       http.MethodPost,
+			body:         `{"id": "test", "type": "test"}`,
+			expectedCode: http.StatusBadRequest,
+			expectedBody: "",
+			hasMem:       false,
+			mem:          mem{},
+		},
+		{
+			name:         "method_post_success",
+			method:       http.MethodPost,
+			body:         `{"id": "test", "type": "gauge"}`,
+			expectedCode: http.StatusOK,
+			expectedBody: `{"id": "test", "type": "gauge", "value": 1.6}`,
+			hasMem:       true,
+			mem: mem{
+				metricName:  "test",
+				metricValue: 1.6,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var bodyReader io.Reader
+			if tc.body != "" {
+				bodyReader = bytes.NewBufferString(tc.body)
+			}
+
+			if tc.hasMem {
+				memory.AddGauge(tc.mem.metricName, tc.mem.metricValue)
+			}
+			req, err := http.NewRequest(tc.method, srv.URL+"/update", bodyReader)
+			if err != nil {
+				t.Fatalf("Не удалось создать запрос: %v", err)
+			}
+
+			if tc.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+
+			resp, err := srv.Client().Do(req)
+			if !assert.NoError(t, err, "error making HTTP request") {
+				return
+			}
+			defer resp.Body.Close()
+
+			assert.Equal(t, tc.expectedCode, resp.StatusCode, "Response code didn't match expected")
+
+			respBody, err := io.ReadAll(resp.Body)
+			assert.NoError(t, err, "error reading response body")
+
+			if tc.expectedBody != "" {
+				assert.JSONEq(t, tc.expectedBody, string(respBody))
+			}
+		})
 	}
 }

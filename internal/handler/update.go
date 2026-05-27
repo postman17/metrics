@@ -2,9 +2,13 @@ package handler
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 
+	"github.com/mailru/easyjson"
+	models "github.com/postman17/metrics/internal/model"
 	mem "github.com/postman17/metrics/internal/repository"
 )
 
@@ -54,6 +58,61 @@ func UpdateMetricPage(memory *mem.MemStorage) http.HandlerFunc {
 
 		rw.Header().Set("Content-Type", "text/plain")
 		rw.WriteHeader(http.StatusOK)
-		fmt.Println(memory)
+		slog.Debug("update metric page", "memory", memory)
+	}
+}
+
+func UpdateMetric(memory *mem.MemStorage) http.HandlerFunc {
+	return func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			rw.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			rw.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer r.Body.Close()
+
+		var req models.Metrics
+		if err := easyjson.Unmarshal(body, &req); err != nil {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		metricType := req.MType
+		metricName := req.ID
+		metricCounterValue := req.Delta
+		metricGaugeValue := req.Value
+		if metricType == "" || metricName == "" {
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		if metricType != "gauge" && metricType != "counter" {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		switch metricType {
+		case "gauge":
+			if metricGaugeValue == nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			memory.AddGauge(metricName, *metricGaugeValue)
+		case "counter":
+			if metricCounterValue == nil {
+				rw.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			memory.AddCounter(metricName, *metricCounterValue)
+		}
+
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte("{}"))
+		slog.Debug("update metric", "memory", memory)
 	}
 }
