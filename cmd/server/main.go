@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
@@ -22,6 +24,13 @@ func main() {
 		os.Exit(1)
 	}
 	config := parseFlags()
+
+	DB, err := sql.Open("pgx", config.Database_DSN)
+	if err != nil {
+		slog.Error("failed db configuration", "err", err)
+		os.Exit(1)
+	}
+	defer DB.Close()
 
 	storeSync := *config.StoreInterval == 0
 	memory := repo.NewMemStorage(storeSync, config.FileStoragePath, *config.Restore)
@@ -58,6 +67,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(memory))
 	r.Post("/value/", handlers.GetMetricValue(memory))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(memory))
+	r.Get("/ping/", handlers.Ping(DB))
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
