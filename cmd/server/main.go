@@ -38,6 +38,12 @@ func main() {
 			os.Exit(1)
 		}
 		defer DB.Close()
+
+		if err := runMigrations(DB); err != nil {
+			slog.Error("failed to apply migrations", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("database migrations applied")
 	}
 
 	storeSync := *config.StoreInterval == 0
