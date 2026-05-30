@@ -90,8 +90,10 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	if err := memory.SaveToFile(); err != nil {
-		slog.Error("memory save to file failed", "err", err)
+	if config.FileStoragePath != "" {
+		if err := memory.SaveToFile(); err != nil {
+			slog.Error("memory save to file failed", "err", err)
+		}
 	}
 
 	appCancel()
