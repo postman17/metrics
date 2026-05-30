@@ -1,11 +1,14 @@
 package repository
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/mailru/easyjson"
 	models "github.com/postman17/metrics/internal/model"
@@ -16,15 +19,27 @@ type MemStorage struct {
 	StoreSync bool
 	FilePath  string
 	mu        sync.Mutex
+	DB        *sql.DB
+	ctx       context.Context
+	WithDB    bool
 }
 
 func (m *MemStorage) AddGauge(name string, value float64) {
 	m.mu.Lock()
 	m.Data[name] = value
 	storeSync := m.StoreSync
+	filePath := m.FilePath
 	m.mu.Unlock()
 
-	if storeSync {
+	if m.WithDB {
+		err := m.AddGaugeToDB(name, value)
+		if err != nil {
+			slog.Error("cant save to db", "err", err)
+		}
+		return
+	}
+
+	if storeSync && filePath != "" {
 		if err := m.SaveToFile(); err != nil {
 			slog.Error(
 				"memory save to file failed", "err", err,
@@ -48,15 +63,26 @@ func (m *MemStorage) AddCounter(name string, value int64) {
 	m.mu.Lock()
 	// новое значение должно добавляться к предыдущему
 	oldValue, ok := m.Data[name].(int64)
+	var newValue int64
 	if ok {
-		m.Data[name] = oldValue + value
+		newValue = oldValue + value
 	} else {
-		m.Data[name] = value
+		newValue = value
 	}
+	m.Data[name] = newValue
 	storeSync := m.StoreSync
+	filePath := m.FilePath
 	m.mu.Unlock()
 
-	if storeSync {
+	if m.WithDB {
+		err := m.AddCounterToDB(name, value)
+		if err != nil {
+			slog.Error("cant save to db", "err", err)
+		}
+		return
+	}
+
+	if storeSync && filePath != "" {
 		if err := m.SaveToFile(); err != nil {
 			slog.Error(
 				"memory save to file failed", "err", err,
@@ -172,11 +198,114 @@ func (m *MemStorage) SaveToFile() error {
 	return nil
 }
 
-func NewMemStorage(storeSync bool, filePath string, restore bool) *MemStorage {
+func (m *MemStorage) AddGaugeToDB(name string, value float64) error {
+	var (
+		id    int64
+		mType string
+	)
+	getCtx, getCancel := context.WithTimeout(m.ctx, 5*time.Second)
+	defer getCancel()
+	row := m.DB.QueryRowContext(
+		getCtx, "SELECT id, m_type FROM metrics WHERE name = $1", name,
+	)
+	err := row.Scan(&id, &mType)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err == nil && mType == "gauge" {
+		updateCtx, updateCancel := context.WithTimeout(m.ctx, 5*time.Second)
+		defer updateCancel()
+		_, err := m.DB.ExecContext(
+			updateCtx, "UPDATE metrics SET value = $1 WHERE id = $2",
+			value, id,
+		)
+		if err != nil {
+			return err
+		}
+		return nil
+	} else if err == nil && mType == "counter" {
+		updateCtx, updateCancel := context.WithTimeout(m.ctx, 5*time.Second)
+		defer updateCancel()
+		_, err := m.DB.ExecContext(
+			updateCtx, "UPDATE metrics SET value = $1, m_type = $2, delta = $3 WHERE id = $4",
+			value, "gauge", 0, id,
+		)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	insertCtx, insertCancel := context.WithTimeout(m.ctx, 5*time.Second)
+	defer insertCancel()
+	_, err = m.DB.ExecContext(
+		insertCtx, "INSERT INTO metrics (name, m_type, value) VALUES ($1, $2, $3)",
+		name, "gauge", value,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *MemStorage) AddCounterToDB(name string, value int64) error {
+	var (
+		id    int64
+		mType string
+		delta int64
+	)
+	getCtx, getCancel := context.WithTimeout(m.ctx, 5*time.Second)
+	defer getCancel()
+	row := m.DB.QueryRowContext(
+		getCtx, "SELECT id, m_type, delta FROM metrics WHERE name = $1", name,
+	)
+	err := row.Scan(&id, &mType, &delta)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err == nil && mType == "counter" {
+		value = delta + value
+		updateCtx, updateCancel := context.WithTimeout(m.ctx, 5*time.Second)
+		defer updateCancel()
+		_, err := m.DB.ExecContext(
+			updateCtx, "UPDATE metrics SET delta = $1 WHERE id = $2",
+			value, id,
+		)
+		if err != nil {
+			return err
+		}
+		return nil
+	} else if err == nil && mType == "gauge" {
+		updateCtx, updateCancel := context.WithTimeout(m.ctx, 5*time.Second)
+		defer updateCancel()
+		_, err := m.DB.ExecContext(
+			updateCtx, "UPDATE metrics SET delta = $1, m_type = $2, value = $3 WHERE id = $4",
+			value, "counter", 0, id,
+		)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	insertCtx, insertCancel := context.WithTimeout(m.ctx, 5*time.Second)
+	defer insertCancel()
+	_, err = m.DB.ExecContext(
+		insertCtx, "INSERT INTO metrics (name, m_type, delta) VALUES ($1, $2, $3)",
+		name, "counter", value,
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func NewMemStorage(ctx context.Context, storeSync bool, filePath string, restore bool, db *sql.DB, withDB bool) *MemStorage {
 	mem := MemStorage{
 		Data:      make(map[string]any),
 		StoreSync: storeSync,
 		FilePath:  filePath,
+		DB:        db,
+		ctx:       ctx,
+		WithDB:    withDB,
 	}
 	if restore {
 		if err := mem.LoadFromFile(); err != nil {

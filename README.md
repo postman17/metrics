@@ -42,3 +42,10 @@ git fetch template && git checkout template/v2 .github
 - **Clean Architecture**
 - **Hexagonal Architecture**
 - **Layered Architecture**
+
+
+### Миграции
+Создание миграции
+migrate create -ext sql -dir ./migrations -seq create_metrics_table
+Применение миграции
+migrate -database "postgres://metrics_user:metrics_user_password@localhost:5432/metrics?sslmode=disable" -path ./migrations up

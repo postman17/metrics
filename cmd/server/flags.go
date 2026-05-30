@@ -25,9 +25,11 @@ func parseFlags() Config {
 	)
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 	flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
-	flag.StringVar(&fileStoragePath, "f", "./file.json", "file storage path")
+	// ./file.json
+	flag.StringVar(&fileStoragePath, "f", "", "file storage path")
 	flag.BoolVar(&restore, "r", false, "load previous values")
-	flag.StringVar(&dbDsn, "d", "postgres://metrics_user:metrics_user_password@localhost:5432/metrics", "dsn database address")
+	// postgres://metrics_user:metrics_user_password@localhost:5432/metrics
+	flag.StringVar(&dbDsn, "d", "", "dsn database address")
 	flag.Parse()
 
 	cfg := Config{}

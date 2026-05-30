@@ -2,10 +2,13 @@ package handler
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-jose/go-jose/v4/testutils/require"
 	repo "github.com/postman17/metrics/internal/repository"
@@ -55,7 +58,9 @@ func TestGetValueHandlerSuccess(t *testing.T) {
 		request.SetPathValue("type", tt.want.metricType)
 		request.SetPathValue("name", tt.want.metricName)
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage(true, "", false)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
 		memory.Data = tt.data
 		GetMetricValuePage(memory)(w, request)
 		res := w.Result()
@@ -117,7 +122,9 @@ func TestGetValueHandlerErrors(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage(true, "", false)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
 		memory.Data = tt.data
 		GetMetricValuePage(memory)(w, request)
 
@@ -132,7 +139,9 @@ func TestGetValueHandlerErrors(t *testing.T) {
 }
 
 func TestGetMetric(t *testing.T) {
-	memory := repo.NewMemStorage(true, "", false)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
 	handler := http.HandlerFunc(GetMetricValue(memory))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()

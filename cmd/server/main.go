@@ -25,27 +25,32 @@ func main() {
 	}
 	config := parseFlags()
 
-	DB, err := sql.Open("pgx", config.Database_DSN)
-	if err != nil {
-		slog.Error("failed db configuration", "err", err)
-		os.Exit(1)
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
+
+	DB := &sql.DB{}
+	var err error
+	withDB := config.Database_DSN != ""
+	if withDB {
+		DB, err = sql.Open("pgx", config.Database_DSN)
+		if err != nil {
+			slog.Error("failed db configuration", "err", err)
+			os.Exit(1)
+		}
+		defer DB.Close()
 	}
-	defer DB.Close()
 
 	storeSync := *config.StoreInterval == 0
-	memory := repo.NewMemStorage(storeSync, config.FileStoragePath, *config.Restore)
+	memory := repo.NewMemStorage(appCtx, storeSync, config.FileStoragePath, *config.Restore, DB, withDB)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	if !storeSync {
+	if !storeSync && config.FileStoragePath != "" {
 		go func() {
 			ticker := time.NewTicker(time.Duration(*config.StoreInterval) * time.Second)
 			defer ticker.Stop()
 
 			for {
 				select {
-				case <-ctx.Done():
+				case <-appCtx.Done():
 					return
 				case <-ticker.C:
 					if err := memory.SaveToFile(); err != nil {
@@ -62,12 +67,15 @@ func main() {
 	r.Use(log.WithLogging)
 	r.Use(gzip.GZIPMiddleware)
 
+	if withDB {
+		r.Get("/ping", handlers.Ping(DB))
+	}
+
 	r.Get("/", handlers.GetMainPage(memory))
 	r.Post("/update/", handlers.UpdateMetric(memory))
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(memory))
 	r.Post("/value/", handlers.GetMetricValue(memory))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(memory))
-	r.Get("/ping", handlers.Ping(DB))
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
@@ -86,7 +94,7 @@ func main() {
 		slog.Error("memory save to file failed", "err", err)
 	}
 
-	cancel()
+	appCancel()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()

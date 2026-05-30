@@ -3,10 +3,13 @@ package gzip
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	handlers "github.com/postman17/metrics/internal/handler"
 	repo "github.com/postman17/metrics/internal/repository"
@@ -14,7 +17,9 @@ import (
 )
 
 func TestGzipCompression(t *testing.T) {
-	memory := repo.NewMemStorage(true, "", false)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
 	handler := GZIPMiddleware(handlers.UpdateMetric(memory))
 
 	srv := httptest.NewServer(handler)
