@@ -298,6 +298,116 @@ func (m *MemStorage) AddCounterToDB(name string, value int64) error {
 	return nil
 }
 
+func (m *MemStorage) AddBatch(data models.MetricsList) error {
+	for _, metric := range data {
+		if metric.ID == "" {
+			return fmt.Errorf("metric id is empty")
+		}
+		if metric.MType != models.Gauge && metric.MType != models.Counter {
+			return fmt.Errorf("invalid metric type: %s", metric.MType)
+		}
+		switch metric.MType {
+		case models.Gauge:
+			if metric.Value == nil {
+				return fmt.Errorf("gauge value is nil for metric %s", metric.ID)
+			}
+		case models.Counter:
+			if metric.Delta == nil {
+				return fmt.Errorf("counter delta is nil for metric %s", metric.ID)
+			}
+		}
+	}
+
+	m.mu.Lock()
+	for _, metric := range data {
+		switch metric.MType {
+		case models.Gauge:
+			m.Data[metric.ID] = *metric.Value
+		case models.Counter:
+			oldValue, ok := m.Data[metric.ID].(int64)
+			var newValue int64
+			if ok {
+				newValue = oldValue + *metric.Delta
+			} else {
+				newValue = *metric.Delta
+			}
+			m.Data[metric.ID] = newValue
+		}
+	}
+	storeSync := m.StoreSync
+	filePath := m.FilePath
+	withDB := m.WithDB
+	m.mu.Unlock()
+
+	if withDB {
+		if err := m.AddBatchToDB(data); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if storeSync && filePath != "" {
+		if err := m.SaveToFile(); err != nil {
+			slog.Error(
+				"memory save to file failed", "err", err,
+			)
+		}
+	}
+
+	return nil
+}
+
+func (m *MemStorage) AddBatchToDB(data models.MetricsList) error {
+	txCtx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+	defer cancel()
+
+	tx, err := m.DB.BeginTx(txCtx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	stmtGauge, err := tx.PrepareContext(txCtx, `
+		INSERT INTO metrics (name, m_type, value, delta) VALUES ($1, 'gauge', $2, 0)
+		ON CONFLICT (name) DO UPDATE SET
+			m_type = 'gauge',
+			value = EXCLUDED.value,
+			delta = 0
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmtGauge.Close()
+
+	stmtCounter, err := tx.PrepareContext(txCtx, `
+		INSERT INTO metrics (name, m_type, delta, value) VALUES ($1, 'counter', $2, 0)
+		ON CONFLICT (name) DO UPDATE SET
+			m_type = 'counter',
+			delta = CASE WHEN metrics.m_type = 'counter' THEN metrics.delta + EXCLUDED.delta ELSE EXCLUDED.delta END,
+			value = 0
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmtCounter.Close()
+
+	for _, metric := range data {
+		switch metric.MType {
+		case models.Gauge:
+			_, err = stmtGauge.ExecContext(txCtx, metric.ID, *metric.Value)
+		case models.Counter:
+			_, err = stmtCounter.ExecContext(txCtx, metric.ID, *metric.Delta)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func NewMemStorage(ctx context.Context, storeSync bool, filePath string, restore bool, db *sql.DB, withDB bool) *MemStorage {
 	mem := MemStorage{
 		Data:      make(map[string]any),

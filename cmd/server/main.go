@@ -82,6 +82,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(memory))
 	r.Post("/value/", handlers.GetMetricValue(memory))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(memory))
+	r.Post("/updates/", handlers.UpdatesMetric(memory))
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
