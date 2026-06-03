@@ -14,28 +14,21 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
-func SendRequest(client http.Client, metric models.Metrics, url string) (*http.Response, error) {
-	jsonData, err := easyjson.Marshal(metric)
-	if err != nil {
-		fmt.Printf("Marshal error: %v\n", err)
-		return nil, err
-	}
-
+func sendGzipJSON(client http.Client, url string, jsonData []byte) (*http.Response, error) {
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
-	_, err = gzWriter.Write(jsonData)
-	if err != nil {
-		slog.Error("Gzip error: %v\n", "err", err)
+	if _, err := gzWriter.Write(jsonData); err != nil {
+		slog.Error("Gzip error", "err", err)
 		return nil, err
 	}
 	if err := gzWriter.Close(); err != nil {
-		slog.Error("Error gzip compress: %v\n", "err", err)
+		slog.Error("Error gzip compress", "err", err)
 		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf.Bytes()))
 	if err != nil {
-		slog.Error("Create request error: %v\n", "err", err)
+		slog.Error("Create request error", "err", err)
 		return nil, err
 	}
 
@@ -48,30 +41,91 @@ func SendRequest(client http.Client, metric models.Metrics, url string) (*http.R
 		fmt.Printf("Send request error: %v\n", err)
 		return nil, err
 	}
+	return resp, nil
+}
+
+func SendRequest(client http.Client, metric models.Metrics, url string) (*http.Response, error) {
+	jsonData, err := easyjson.Marshal(metric)
+	if err != nil {
+		fmt.Printf("Marshal error: %v\n", err)
+		return nil, err
+	}
+
+	resp, err := sendGzipJSON(client, url, jsonData)
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
 	return resp, nil
 }
 
-func SendGaugeData(client http.Client, config Config, name string, data float64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update/", config.RunAddr)
-	metric := models.Metrics{
-		ID:    name,
-		MType: "gauge",
-		Value: &data,
+func SendBatchRequest(client http.Client, config Config, metrics models.MetricsList) (*http.Response, error) {
+	url := fmt.Sprintf("%s/updates/", config.RunAddr)
+
+	jsonData, err := easyjson.Marshal(metrics)
+	if err != nil {
+		fmt.Printf("Marshal error: %v\n", err)
+		return nil, err
 	}
 
-	return SendRequest(client, metric, url)
+	resp, err := sendGzipJSON(client, url, jsonData)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return resp, nil
 }
 
-func SendCounterData(client http.Client, config Config, name string, data int64) (*http.Response, error) {
-	url := fmt.Sprintf("%s/update/", config.RunAddr)
-	metric := models.Metrics{
+func gaugeMetric(name string, value float64) models.Metrics {
+	v := value
+	return models.Metrics{
+		ID:    name,
+		MType: "gauge",
+		Value: &v,
+	}
+}
+
+func counterMetric(name string, delta int64) models.Metrics {
+	d := delta
+	return models.Metrics{
 		ID:    name,
 		MType: "counter",
-		Delta: &data,
+		Delta: &d,
 	}
+}
 
-	return SendRequest(client, metric, url)
+func runtimeMetrics(m *runtime.MemStats) models.MetricsList {
+	return models.MetricsList{
+		gaugeMetric("Alloc", float64(m.Alloc)),
+		gaugeMetric("BuckHashSys", float64(m.BuckHashSys)),
+		gaugeMetric("Frees", float64(m.Frees)),
+		gaugeMetric("GCCPUFraction", float64(m.GCCPUFraction)),
+		gaugeMetric("GCSys", float64(m.GCSys)),
+		gaugeMetric("HeapAlloc", float64(m.HeapAlloc)),
+		gaugeMetric("HeapIdle", float64(m.HeapIdle)),
+		gaugeMetric("HeapInuse", float64(m.HeapInuse)),
+		gaugeMetric("HeapObjects", float64(m.HeapObjects)),
+		gaugeMetric("HeapReleased", float64(m.HeapReleased)),
+		gaugeMetric("HeapSys", float64(m.HeapSys)),
+		gaugeMetric("LastGC", float64(m.LastGC)),
+		gaugeMetric("Lookups", float64(m.Lookups)),
+		gaugeMetric("MCacheInuse", float64(m.MCacheInuse)),
+		gaugeMetric("MCacheSys", float64(m.MCacheSys)),
+		gaugeMetric("MSpanInuse", float64(m.MSpanInuse)),
+		gaugeMetric("MSpanSys", float64(m.MSpanSys)),
+		gaugeMetric("Mallocs", float64(m.Mallocs)),
+		gaugeMetric("NextGC", float64(m.NextGC)),
+		gaugeMetric("NumForcedGC", float64(m.NumForcedGC)),
+		gaugeMetric("NumGC", float64(m.NumGC)),
+		gaugeMetric("OtherSys", float64(m.OtherSys)),
+		gaugeMetric("PauseTotalNs", float64(m.PauseTotalNs)),
+		gaugeMetric("StackInuse", float64(m.StackInuse)),
+		gaugeMetric("StackSys", float64(m.StackSys)),
+		gaugeMetric("Sys", float64(m.Sys)),
+		gaugeMetric("TotalAlloc", float64(m.TotalAlloc)),
+		gaugeMetric("RandomValue", rand.Float64()),
+		counterMetric("PollCount", 1),
+	}
 }
 
 func main() {
@@ -91,35 +145,10 @@ func main() {
 			runtime.ReadMemStats(&m)
 			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
-			SendGaugeData(*client, config, "Alloc", float64(m.Alloc))
-			SendGaugeData(*client, config, "BuckHashSys", float64(m.BuckHashSys))
-			SendGaugeData(*client, config, "Frees", float64(m.Frees))
-			SendGaugeData(*client, config, "GCCPUFraction", float64(m.GCCPUFraction))
-			SendGaugeData(*client, config, "GCSys", float64(m.GCSys))
-			SendGaugeData(*client, config, "HeapAlloc", float64(m.HeapAlloc))
-			SendGaugeData(*client, config, "HeapIdle", float64(m.HeapIdle))
-			SendGaugeData(*client, config, "HeapInuse", float64(m.HeapInuse))
-			SendGaugeData(*client, config, "HeapObjects", float64(m.HeapObjects))
-			SendGaugeData(*client, config, "HeapReleased", float64(m.HeapReleased))
-			SendGaugeData(*client, config, "HeapSys", float64(m.HeapSys))
-			SendGaugeData(*client, config, "LastGC", float64(m.LastGC))
-			SendGaugeData(*client, config, "Lookups", float64(m.Lookups))
-			SendGaugeData(*client, config, "MCacheInuse", float64(m.MCacheInuse))
-			SendGaugeData(*client, config, "MCacheSys", float64(m.MCacheSys))
-			SendGaugeData(*client, config, "MSpanInuse", float64(m.MSpanInuse))
-			SendGaugeData(*client, config, "MSpanSys", float64(m.MSpanSys))
-			SendGaugeData(*client, config, "Mallocs", float64(m.Mallocs))
-			SendGaugeData(*client, config, "NextGC", float64(m.NextGC))
-			SendGaugeData(*client, config, "NumForcedGC", float64(m.NumForcedGC))
-			SendGaugeData(*client, config, "NumGC", float64(m.NumGC))
-			SendGaugeData(*client, config, "OtherSys", float64(m.OtherSys))
-			SendGaugeData(*client, config, "PauseTotalNs", float64(m.PauseTotalNs))
-			SendGaugeData(*client, config, "StackInuse", float64(m.StackInuse))
-			SendGaugeData(*client, config, "StackSys", float64(m.StackSys))
-			SendGaugeData(*client, config, "Sys", float64(m.Sys))
-			SendGaugeData(*client, config, "TotalAlloc", float64(m.TotalAlloc))
-			SendGaugeData(*client, config, "RandomValue", rand.Float64())
-			SendCounterData(*client, config, "PollCount", 1)
+			_, err := SendBatchRequest(*client, config, runtimeMetrics(&m))
+			if err != nil {
+				slog.Error("Send batch metrics error", "err", err)
+			}
 			slog.Info("Slow tic:", "time", t2)
 		}
 	}
