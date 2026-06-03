@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -13,6 +14,12 @@ import (
 	"github.com/mailru/easyjson"
 	models "github.com/postman17/metrics/internal/model"
 )
+
+var sendGzipJSONRetryDelays = []time.Duration{
+	1 * time.Second,
+	3 * time.Second,
+	5 * time.Second,
+}
 
 func sendGzipJSON(client http.Client, url string, jsonData []byte) (*http.Response, error) {
 	var buf bytes.Buffer
@@ -26,22 +33,36 @@ func sendGzipJSON(client http.Client, url string, jsonData []byte) (*http.Respon
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(buf.Bytes()))
-	if err != nil {
-		slog.Error("Create request error", "err", err)
-		return nil, err
+	body := buf.Bytes()
+	var lastErr error
+	for attempt := 0; attempt <= len(sendGzipJSONRetryDelays); attempt++ {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			slog.Error("Create request error", "err", err)
+			return nil, err
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("Accept-Encoding", "gzip")
+
+		resp, err := client.Do(req)
+		if err == nil {
+			return resp, nil
+		}
+
+		lastErr = err
+		if attempt == len(sendGzipJSONRetryDelays) {
+			break
+		}
+
+		delay := sendGzipJSONRetryDelays[attempt]
+		slog.Warn("Send request error, retrying", "err", err, "attempt", attempt+1, "delay", delay)
+		time.Sleep(delay)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
-	req.Header.Set("Accept-Encoding", "gzip")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("Send request error: %v\n", err)
-		return nil, err
-	}
-	return resp, nil
+	fmt.Printf("Send request error: %v\n", lastErr)
+	return nil, lastErr
 }
 
 func SendRequest(client http.Client, metric models.Metrics, url string) (*http.Response, error) {

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	dbconfig "github.com/postman17/metrics/internal/config/db"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
@@ -32,7 +32,7 @@ func main() {
 	var err error
 	withDB := config.Database_DSN != ""
 	if withDB {
-		DB, err = sql.Open("pgx", config.Database_DSN)
+		DB, err = dbconfig.Open(appCtx, config.Database_DSN)
 		if err != nil {
 			slog.Error("failed db configuration", "err", err)
 			os.Exit(1)
