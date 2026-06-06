@@ -2,13 +2,10 @@ package handler
 
 import (
 	"bytes"
-	"context"
-	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/go-jose/go-jose/v4/testutils/require"
 	repo "github.com/postman17/metrics/internal/repository"
@@ -84,13 +81,10 @@ func TestUpdateHandlerSuccess(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 		request.SetPathValue("value", tt.want.metricValue)
 		w := httptest.NewRecorder()
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
-		memory.Data = tt.data
+		memory := repo.NewMemStorageWithData(tt.data)
 		UpdateMetricPage(memory)(w, request)
 
-		assert.Equal(t, memory.Data[tt.want.metricName], tt.want.resultValue)
+		assert.Equal(t, tt.want.resultValue, memory.GetTypeValue(tt.want.metricName))
 		res := w.Result()
 		assert.Equal(t, tt.want.code, res.StatusCode)
 
@@ -185,10 +179,7 @@ func TestUpdateHandlerErrors(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 		request.SetPathValue("value", tt.want.metricValue)
 		w := httptest.NewRecorder()
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
-		memory.Data = tt.data
+		memory := repo.NewMemStorageWithData(tt.data)
 		UpdateMetricPage(memory)(w, request)
 
 		res := w.Result()
@@ -202,9 +193,7 @@ func TestUpdateHandlerErrors(t *testing.T) {
 }
 
 func TestUpdateMetric(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
+	memory := repo.NewMemStorage()
 	handler := http.HandlerFunc(UpdateMetric(memory))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()

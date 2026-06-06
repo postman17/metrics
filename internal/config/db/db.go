@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
-	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -64,13 +64,9 @@ func Open(ctx context.Context, dsn string) (*sql.DB, error) {
 
 func isRetryableConnectError(err error) bool {
 	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
-		return true
+	if errors.As(err, &pgErr) {
+		return strings.HasPrefix(pgErr.Code, "08")
 	}
 
-	if pgErr.Code == pgerrcode.UniqueViolation {
-		return false
-	}
-
-	return pgerrcode.IsConnectionException(pgErr.Code)
+	return false
 }

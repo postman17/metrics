@@ -10,7 +10,7 @@ import (
 	mem "github.com/postman17/metrics/internal/repository"
 )
 
-func UpdatesMetric(memory *mem.MemStorage) http.HandlerFunc {
+func UpdatesMetric(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
@@ -31,13 +31,13 @@ func UpdatesMetric(memory *mem.MemStorage) http.HandlerFunc {
 			return
 		}
 
-		err = memory.AddBatch(req)
+		err = storage.AddBatch(req)
 		if err != nil {
 			rw.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		rw.WriteHeader(http.StatusOK)
 		_, _ = rw.Write([]byte("{}"))
-		slog.Debug("update metric", "memory", memory)
+		slog.Debug("update metric", "storage", storage)
 	}
 }

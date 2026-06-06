@@ -2,22 +2,17 @@ package handler
 
 import (
 	"bytes"
-	"context"
-	"database/sql"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	repo "github.com/postman17/metrics/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdatesMetric(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
+	memory := repo.NewMemStorage()
 	handler := http.HandlerFunc(UpdatesMetric(memory))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
@@ -130,9 +125,7 @@ func TestUpdatesMetric(t *testing.T) {
 }
 
 func TestUpdatesMetricSuccess(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
+	memory := repo.NewMemStorage()
 
 	body := `[{"id": "Alloc", "type": "gauge", "value": 1.6}, {"id": "PollCount", "type": "counter", "delta": 5}]`
 	req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewBufferString(body))
@@ -150,15 +143,14 @@ func TestUpdatesMetricSuccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.JSONEq(t, `{}`, string(respBody))
 
-	assert.Equal(t, 1.6, memory.Data["Alloc"])
-	assert.Equal(t, int64(5), memory.Data["PollCount"])
+	assert.Equal(t, 1.6, memory.GetTypeValue("Alloc"))
+	assert.Equal(t, int64(5), memory.GetTypeValue("PollCount"))
 }
 
 func TestUpdatesMetricCounterAccumulation(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	memory := repo.NewMemStorage(ctx, true, "", false, &sql.DB{}, false)
-	memory.Data["PollCount"] = int64(10)
+	memory := repo.NewMemStorageWithData(map[string]any{
+		"PollCount": int64(10),
+	})
 
 	body := `[{"id": "PollCount", "type": "counter", "delta": 3}]`
 	req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewBufferString(body))
@@ -171,5 +163,5 @@ func TestUpdatesMetricCounterAccumulation(t *testing.T) {
 	defer res.Body.Close()
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
-	assert.Equal(t, int64(13), memory.Data["PollCount"])
+	assert.Equal(t, int64(13), memory.GetTypeValue("PollCount"))
 }

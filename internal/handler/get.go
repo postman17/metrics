@@ -10,7 +10,7 @@ import (
 	mem "github.com/postman17/metrics/internal/repository"
 )
 
-func GetMetricValuePage(memory *mem.MemStorage) http.HandlerFunc {
+func GetMetricValuePage(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
@@ -27,7 +27,7 @@ func GetMetricValuePage(memory *mem.MemStorage) http.HandlerFunc {
 			rw.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		value := memory.GetTypeValue(metricName)
+		value := storage.GetTypeValue(metricName)
 		if value == nil {
 			rw.WriteHeader(http.StatusNotFound)
 			return
@@ -40,11 +40,11 @@ func GetMetricValuePage(memory *mem.MemStorage) http.HandlerFunc {
 
 		rw.Header().Set("Content-Type", "text/plain")
 		rw.WriteHeader(http.StatusOK)
-		slog.Debug("get metric value page", "memory", memory)
+		slog.Debug("get metric value page", "storage", storage)
 	}
 }
 
-func GetMetricValue(memory *mem.MemStorage) http.HandlerFunc {
+func GetMetricValue(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
@@ -69,7 +69,7 @@ func GetMetricValue(memory *mem.MemStorage) http.HandlerFunc {
 			rw.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		value := memory.GetTypeValue(metricName)
+		value := storage.GetTypeValue(metricName)
 		if value == nil {
 			rw.WriteHeader(http.StatusNotFound)
 			return
