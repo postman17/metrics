@@ -24,7 +24,7 @@ const htmlPage = `
 </body>
 </html>`
 
-func GetMainPage(memory *mem.MemStorage) http.HandlerFunc {
+func GetMainPage(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
@@ -33,7 +33,7 @@ func GetMainPage(memory *mem.MemStorage) http.HandlerFunc {
 		rw.Header().Set("Content-Type", "text/html")
 		rw.WriteHeader(http.StatusOK)
 		template := template.Must(template.New("metrics").Parse(htmlPage))
-		err := template.Execute(rw, memory.Data)
+		err := template.Execute(rw, storage.GetAll())
 		if err != nil {
 			fmt.Println("Ошибка шаблона:", err)
 		}

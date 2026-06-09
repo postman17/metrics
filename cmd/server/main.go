@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	dbconfig "github.com/postman17/metrics/internal/config/db"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
@@ -23,41 +25,36 @@ func main() {
 	}
 	config := parseFlags()
 
-	storeSync := *config.StoreInterval == 0
-	memory := repo.NewMemStorage(storeSync, config.FileStoragePath, *config.Restore)
+	appCtx, appCancel := context.WithCancel(context.Background())
+	defer appCancel()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	storage, db, err := newMetricsRepository(appCtx, config)
+	if err != nil {
+		slog.Error("failed to initialize storage", "err", err)
+		os.Exit(1)
+	}
+	if db != nil {
+		defer db.Close()
+	}
 
-	if !storeSync {
-		go func() {
-			ticker := time.NewTicker(time.Duration(*config.StoreInterval) * time.Second)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					if err := memory.SaveToFile(); err != nil {
-						slog.Error(
-							"memory save to file failed", "err", err,
-						)
-					}
-				}
-			}
-		}()
+	if persistent, ok := storage.(repo.PersistentRepository); ok && !(*config.StoreInterval == 0) {
+		go runPeriodicSave(appCtx, persistent, time.Duration(*config.StoreInterval)*time.Second)
 	}
 
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
 	r.Use(gzip.GZIPMiddleware)
 
-	r.Get("/", handlers.GetMainPage(memory))
-	r.Post("/update/", handlers.UpdateMetric(memory))
-	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(memory))
-	r.Post("/value/", handlers.GetMetricValue(memory))
-	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(memory))
+	if db != nil {
+		r.Get("/ping", handlers.Ping(db))
+	}
+
+	r.Get("/", handlers.GetMainPage(storage))
+	r.Post("/update/", handlers.UpdateMetric(storage))
+	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(storage))
+	r.Post("/value/", handlers.GetMetricValue(storage))
+	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(storage))
+	r.Post("/updates/", handlers.UpdatesMetric(storage))
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
@@ -72,16 +69,62 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	if err := memory.SaveToFile(); err != nil {
-		slog.Error("memory save to file failed", "err", err)
+	if persistent, ok := storage.(repo.PersistentRepository); ok {
+		if err := persistent.Save(); err != nil {
+			slog.Error("storage save failed", "err", err)
+		}
 	}
 
-	cancel()
+	appCancel()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server shutdown failed", "err", err)
+	}
+}
+
+func newMetricsRepository(ctx context.Context, config Config) (repo.MetricsRepository, *sql.DB, error) {
+	if config.Database_DSN != "" {
+		db, err := dbconfig.Open(ctx, config.Database_DSN)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if err := runMigrations(db); err != nil {
+			db.Close()
+			return nil, nil, err
+		}
+		slog.Info("database migrations applied")
+
+		return repo.NewDBStorage(ctx, db), db, nil
+	}
+
+	if config.FileStoragePath != "" {
+		storeSync := *config.StoreInterval == 0
+		storage, err := repo.NewFileStorage(config.FileStoragePath, storeSync, *config.Restore)
+		if err != nil {
+			return nil, nil, err
+		}
+		return storage, nil, nil
+	}
+
+	return repo.NewMemStorage(), nil, nil
+}
+
+func runPeriodicSave(ctx context.Context, storage repo.PersistentRepository, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := storage.Save(); err != nil {
+				slog.Error("storage save failed", "err", err)
+			}
+		}
 	}
 }

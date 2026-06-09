@@ -12,7 +12,7 @@ import (
 	mem "github.com/postman17/metrics/internal/repository"
 )
 
-func UpdateMetricPage(memory *mem.MemStorage) http.HandlerFunc {
+func UpdateMetricPage(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
@@ -38,31 +38,31 @@ func UpdateMetricPage(memory *mem.MemStorage) http.HandlerFunc {
 				rw.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			if memory.CheckCounterType(metricName) {
+			if storage.CheckCounterType(metricName) {
 				rw.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			memory.AddGauge(metricName, value)
+			storage.AddGauge(metricName, value)
 		} else if metricType == "counter" {
 			value, err := strconv.ParseInt(metricValue, 10, 64)
 			if err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			if memory.CheckGaugeType(metricName) {
+			if storage.CheckGaugeType(metricName) {
 				rw.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			memory.AddCounter(metricName, value)
+			storage.AddCounter(metricName, value)
 		}
 
 		rw.Header().Set("Content-Type", "text/plain")
 		rw.WriteHeader(http.StatusOK)
-		slog.Debug("update metric page", "memory", memory)
+		slog.Debug("update metric page", "storage", storage)
 	}
 }
 
-func UpdateMetric(memory *mem.MemStorage) http.HandlerFunc {
+func UpdateMetric(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
@@ -102,17 +102,17 @@ func UpdateMetric(memory *mem.MemStorage) http.HandlerFunc {
 				rw.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			memory.AddGauge(metricName, *metricGaugeValue)
+			storage.AddGauge(metricName, *metricGaugeValue)
 		case "counter":
 			if metricCounterValue == nil {
 				rw.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			memory.AddCounter(metricName, *metricCounterValue)
+			storage.AddCounter(metricName, *metricCounterValue)
 		}
 
 		rw.WriteHeader(http.StatusOK)
 		_, _ = rw.Write([]byte("{}"))
-		slog.Debug("update metric", "memory", memory)
+		slog.Debug("update metric", "storage", storage)
 	}
 }

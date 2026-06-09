@@ -81,11 +81,10 @@ func TestUpdateHandlerSuccess(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 		request.SetPathValue("value", tt.want.metricValue)
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage(true, "", false)
-		memory.Data = tt.data
+		memory := repo.NewMemStorageWithData(tt.data)
 		UpdateMetricPage(memory)(w, request)
 
-		assert.Equal(t, memory.Data[tt.want.metricName], tt.want.resultValue)
+		assert.Equal(t, tt.want.resultValue, memory.GetTypeValue(tt.want.metricName))
 		res := w.Result()
 		assert.Equal(t, tt.want.code, res.StatusCode)
 
@@ -180,8 +179,7 @@ func TestUpdateHandlerErrors(t *testing.T) {
 		request.SetPathValue("name", tt.want.metricName)
 		request.SetPathValue("value", tt.want.metricValue)
 		w := httptest.NewRecorder()
-		memory := repo.NewMemStorage(true, "", false)
-		memory.Data = tt.data
+		memory := repo.NewMemStorageWithData(tt.data)
 		UpdateMetricPage(memory)(w, request)
 
 		res := w.Result()
@@ -195,7 +193,7 @@ func TestUpdateHandlerErrors(t *testing.T) {
 }
 
 func TestUpdateMetric(t *testing.T) {
-	memory := repo.NewMemStorage(true, "", false)
+	memory := repo.NewMemStorage()
 	handler := http.HandlerFunc(UpdateMetric(memory))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()

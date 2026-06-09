@@ -6,17 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	mem "github.com/postman17/metrics/internal/repository"
+	repo "github.com/postman17/metrics/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetMainPage(t *testing.T) {
-	storage := &mem.MemStorage{
-		Data: map[string]any{
-			"GaugeMetric":   1.23,
-			"CounterMetric": 10,
-		},
-	}
+	storage := repo.NewMemStorageWithData(map[string]any{
+		"GaugeMetric":   1.23,
+		"CounterMetric": int64(10),
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
