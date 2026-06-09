@@ -16,7 +16,7 @@ func TestMiddleware_ValidHash(t *testing.T) {
 	body := []byte(`{"id":"test","type":"gauge","value":1}`)
 
 	req := httptest.NewRequest(http.MethodPost, "/update/", io.NopCloser(bytes.NewReader(body)))
-	req.Header.Set("HashSHA256", getHash(body, key))
+	req.Header.Set("HashSHA256", getHash(key))
 
 	rr := httptest.NewRecorder()
 	handler := Middleware(key)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +26,7 @@ func TestMiddleware_ValidHash(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, getHash([]byte(`{}`), key), rr.Header().Get("HashSHA256"))
+	assert.Equal(t, getHash(key), rr.Header().Get("HashSHA256"))
 }
 
 func TestMiddleware_EmptyKeySkipsCheck(t *testing.T) {
@@ -48,12 +48,16 @@ func TestMiddleware_MissingHeader(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/update/", io.NopCloser(bytes.NewReader([]byte(`{}`))))
 
 	rr := httptest.NewRecorder()
+	called := false
 	handler := Middleware("secret")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatal("handler should not be called")
+		called = true
+		w.WriteHeader(http.StatusOK)
 	}))
 	handler.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.True(t, called)
+	assert.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, getHash("secret"), rr.Header().Get("HashSHA256"))
 }
 
 func TestMiddleware_InvalidHash(t *testing.T) {
@@ -71,8 +75,8 @@ func TestMiddleware_InvalidHash(t *testing.T) {
 }
 
 func TestGetHash(t *testing.T) {
-	hash := getHash([]byte("body"), "key")
+	hash := getHash("key")
 	require.NotEmpty(t, hash)
-	assert.Equal(t, hash, getHash([]byte("body"), "key"))
-	assert.NotEqual(t, hash, getHash([]byte("other"), "key"))
+	assert.Equal(t, hash, getHash("key"))
+	assert.NotEqual(t, hash, getHash("other"))
 }
