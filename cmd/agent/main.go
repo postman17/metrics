@@ -143,6 +143,11 @@ func runtimeMetrics(m *runtime.MemStats) models.MetricsList {
 	}
 }
 
+func collectData(channel chan runtime.MemStats, data runtime.MemStats) {
+	runtime.ReadMemStats(&data)
+	channel <- data
+}
+
 func main() {
 	config := parseFlags()
 
@@ -154,10 +159,12 @@ func main() {
 		Timeout: 10 * time.Second,
 	}
 	var m runtime.MemStats
+	channel := make(chan runtime.MemStats)
+	defer close(channel)
 	for {
 		select {
 		case t1 := <-tickerPoll.C:
-			runtime.ReadMemStats(&m)
+			go collectData(channel, m)
 			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
 			_, err := SendBatchRequest(*client, config, runtimeMetrics(&m))
