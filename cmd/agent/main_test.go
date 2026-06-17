@@ -106,7 +106,7 @@ func TestRuntimeMetrics(t *testing.T) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	metrics := runtimeMetrics(&m)
+	metrics := runtimeMetrics(&m, 1)
 	require.Len(t, metrics, 29)
 
 	byID := make(map[string]models.Metrics, len(metrics))
