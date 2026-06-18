@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"io"
 	"os"
 	"os/signal"
 	"runtime"
@@ -149,12 +150,33 @@ type metricsStore struct {
 	mu        sync.Mutex
 	memStats  runtime.MemStats
 	pollCount int64
+	totalMem  float64
+	freeMem   float64
+	cpuUtil   float64
 }
 
 func (s *metricsStore) collect() {
 	s.mu.Lock()
 	runtime.ReadMemStats(&s.memStats)
 	s.pollCount++
+	s.mu.Unlock()
+}
+
+func (s *metricsStore) collectPsUtil() {
+	s.mu.Lock()
+	vMem, err := mem.VirtualMemory()
+	if err != nil {
+		slog.Error("Memory get failed", "err", err)
+	} else {
+		s.totalMem = float64(vMem.Total)
+		s.freeMem = float64(vMem.Free)
+	}
+	cpuPercentages, err := cpu.Percent(0, false)
+	if err != nil {
+		slog.Error("CPU data failed", "err", err)
+	} else if len(cpuPercentages) > 0 {
+		s.cpuUtil = cpuPercentages[0]
+	}
 	s.mu.Unlock()
 }
 
@@ -167,6 +189,14 @@ func (s *metricsStore) snapshot() (runtime.MemStats, int64) {
 	return ms, pc
 }
 
+func psUtilMetrics(store *metricsStore) models.MetricsList {
+	var result models.MetricsList
+	result = append(result, gaugeMetric("TotalMemory", store.totalMem))
+	result = append(result, gaugeMetric("FreeMemory", store.freeMem))
+	result = append(result, gaugeMetric("CPUutilization1", store.cpuUtil))
+	return result
+}
+
 func collectWorker(ctx context.Context, store *metricsStore, pollInterval time.Duration) {
 	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
@@ -176,6 +206,7 @@ func collectWorker(ctx context.Context, store *metricsStore, pollInterval time.D
 			return
 		case <-ticker.C:
 			store.collect()
+			store.collectPsUtil()
 			slog.Info("Collected runtime metrics")
 		}
 	}
@@ -192,27 +223,23 @@ func sendWorker(ctx context.Context, client http.Client, jobCh <-chan models.Met
 				slog.Error("Send batch metrics error", "err", err)
 				continue
 			}
+			var reader io.Reader = resp.Body
+			if resp.Header.Get("Content-Encoding") == "gzip" {
+				gzReader, err := gzip.NewReader(resp.Body)
+				if err != nil {
+					slog.Error("Gzip decompress error", "err", err)
+					resp.Body.Close()
+					continue
+				}
+				defer gzReader.Close()
+				reader = gzReader
+			}
+			if _, err := io.ReadAll(reader); err != nil {
+				slog.Error("Response read error", "err", err)
+			}
 			resp.Body.Close()
 		}
 	}
-}
-
-func collectGopsutilMetrics() models.MetricsList {
-	var result models.MetricsList
-	vMem, err := mem.VirtualMemory()
-	if err != nil {
-		slog.Error("Memory get failed", "err", err)
-	} else {
-		result = append(result, gaugeMetric("TotalMemory", float64(vMem.Total)))
-		result = append(result, gaugeMetric("FreeMemory", float64(vMem.Free)))
-	}
-	cpuPercentages, err := cpu.Percent(0, false)
-	if err != nil {
-		slog.Error("CPU data failed", "err", err)
-	} else if len(cpuPercentages) > 0 {
-		result = append(result, gaugeMetric("CPUutilization1", cpuPercentages[0]))
-	}
-	return result
 }
 
 func main() {
@@ -256,7 +283,7 @@ func main() {
 				continue
 			}
 			metrics := runtimeMetrics(&memStats, pollCount)
-			metrics = append(metrics, collectGopsutilMetrics()...)
+			metrics = append(metrics, psUtilMetrics(store)...)
 
 			select {
 			case jobCh <- metrics:

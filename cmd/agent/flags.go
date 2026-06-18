@@ -36,7 +36,7 @@ func parseFlags() Config {
 	flag.Int64Var(&reportInterval, "r", 10, "reportInterval")
 	flag.Int64Var(&pollInterval, "p", 2, "pollInterval")
 	flag.StringVar(&key, "k", "", "key")
-	flag.Int64Var(&rateLimit, "l", 3, "pollInterval")
+	flag.Int64Var(&rateLimit, "l", 3, "rateLimit")
 	flag.Parse()
 
 	cfg := Config{}
