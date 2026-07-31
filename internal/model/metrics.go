@@ -28,3 +28,10 @@ type GetMetricRequest struct {
 
 //easyjson:json
 type MetricsList []Metrics
+
+//easyjson:json
+type AuditMetrics struct {
+	TS        int64    `json:"ts"`
+	Metrics   []string `json:"metrics"`
+	IPAddress string   `json:"ip_address"`
+}

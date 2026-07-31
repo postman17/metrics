@@ -14,6 +14,8 @@ type Config struct {
 	Restore         *bool  `env:"RESTORE"`
 	Database_DSN    string `env:"DATABASE_DSN"`
 	Key             string `env:"KEY"`
+	AuditFile       string `env:"AUDIT_FILE"`
+	AuditURL        string `env:"AUDIT_URL"`
 }
 
 func parseFlags() Config {
@@ -24,6 +26,8 @@ func parseFlags() Config {
 		restore         bool
 		dbDsn           string
 		key             string
+		auditFile       string
+		auditURL        string
 	)
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 	flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
@@ -33,6 +37,8 @@ func parseFlags() Config {
 	// postgres://metrics_user:metrics_user_password@localhost:5432/metrics
 	flag.StringVar(&dbDsn, "d", "", "dsn database address")
 	flag.StringVar(&key, "k", "", "key")
+	flag.StringVar(&auditFile, "h", "", "audit file")
+	flag.StringVar(&auditURL, "u", "", "audit url")
 	flag.Parse()
 
 	cfg := Config{}
@@ -58,6 +64,12 @@ func parseFlags() Config {
 	if cfg.Key != "" {
 		key = cfg.Key
 	}
+	if cfg.AuditFile != "" {
+		auditFile = cfg.AuditFile
+	}
+	if cfg.AuditURL != "" {
+		auditURL = cfg.AuditURL
+	}
 
 	return Config{
 		RunAddr:         runAddr,
@@ -66,5 +78,7 @@ func parseFlags() Config {
 		Restore:         &restore,
 		Database_DSN:    dbDsn,
 		Key:             key,
+		AuditFile:       auditFile,
+		AuditURL:        auditURL,
 	}
 }

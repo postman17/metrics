@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	audit "github.com/postman17/metrics/internal/audit"
 	dbconfig "github.com/postman17/metrics/internal/config/db"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
@@ -42,6 +43,14 @@ func main() {
 		go runPeriodicSave(appCtx, persistent, time.Duration(*config.StoreInterval)*time.Second)
 	}
 
+	pub := audit.Pub{}
+	if config.AuditFile != "" {
+		pub.Register(&audit.FileSubscriber{ID: "file", FilePath: config.AuditFile})
+	}
+	if config.AuditURL != "" {
+		pub.Register(&audit.URLSubscriber{ID: "url", URL: config.AuditURL})
+	}
+
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
 	r.Use(gzip.GZIPMiddleware)
@@ -56,7 +65,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(storage))
 	r.Post("/value/", handlers.GetMetricValue(storage))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(storage))
-	r.Post("/updates/", handlers.UpdatesMetric(storage))
+	r.Post("/updates/", handlers.UpdatesMetric(storage, pub))
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
