@@ -7,13 +7,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/postman17/metrics/internal/audit"
 	repo "github.com/postman17/metrics/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdatesMetric(t *testing.T) {
 	memory := repo.NewMemStorage()
-	handler := http.HandlerFunc(UpdatesMetric(memory))
+	pub := &audit.Pub{}
+	handler := http.HandlerFunc(UpdatesMetric(memory, *pub))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -126,13 +128,14 @@ func TestUpdatesMetric(t *testing.T) {
 
 func TestUpdatesMetricSuccess(t *testing.T) {
 	memory := repo.NewMemStorage()
+	pub := &audit.Pub{}
 
 	body := `[{"id": "Alloc", "type": "gauge", "value": 1.6}, {"id": "PollCount", "type": "counter", "delta": 5}]`
 	req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	UpdatesMetric(memory)(w, req)
+	UpdatesMetric(memory, *pub)(w, req)
 
 	res := w.Result()
 	defer res.Body.Close()
@@ -151,13 +154,14 @@ func TestUpdatesMetricCounterAccumulation(t *testing.T) {
 	memory := repo.NewMemStorageWithData(map[string]any{
 		"PollCount": int64(10),
 	})
+	pub := &audit.Pub{}
 
 	body := `[{"id": "PollCount", "type": "counter", "delta": 3}]`
 	req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	UpdatesMetric(memory)(w, req)
+	UpdatesMetric(memory, *pub)(w, req)
 
 	res := w.Result()
 	defer res.Body.Close()

@@ -87,7 +87,6 @@ func SendBatchRequest(client http.Client, config Config, metrics models.MetricsL
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 	return resp, nil
 }
 
@@ -160,9 +159,11 @@ func main() {
 			runtime.ReadMemStats(&m)
 			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
-			_, err := SendBatchRequest(*client, config, runtimeMetrics(&m))
+			resp, err := SendBatchRequest(*client, config, runtimeMetrics(&m))
 			if err != nil {
 				slog.Error("Send batch metrics error", "err", err)
+			} else {
+				resp.Body.Close()
 			}
 			slog.Info("Slow tic:", "time", t2)
 		}

@@ -97,8 +97,8 @@ func main() {
 }
 
 func newMetricsRepository(ctx context.Context, config Config) (repo.MetricsRepository, *sql.DB, error) {
-	if config.Database_DSN != "" {
-		db, err := dbconfig.Open(ctx, config.Database_DSN)
+	if config.DatabaseDSN != "" {
+		db, err := dbconfig.Open(ctx, config.DatabaseDSN)
 		if err != nil {
 			return nil, nil, err
 		}

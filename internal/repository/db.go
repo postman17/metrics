@@ -131,6 +131,9 @@ func (d *DBStorage) GetAll() map[string]any {
 			}
 		}
 	}
+	if err := rows.Err(); err != nil {
+		slog.Error("rows iteration error", "err", err)
+	}
 	return result
 }
 
