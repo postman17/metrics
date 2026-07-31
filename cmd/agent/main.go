@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -21,7 +23,13 @@ var sendGzipJSONRetryDelays = []time.Duration{
 	5 * time.Second,
 }
 
-func sendGzipJSON(client http.Client, url string, jsonData []byte) (*http.Response, error) {
+func getHash(key string) string {
+	hash := sha256.New()
+	hash.Write([]byte(key))
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func sendGzipJSON(client http.Client, url string, jsonData []byte, key string) (*http.Response, error) {
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
 	if _, err := gzWriter.Write(jsonData); err != nil {
@@ -45,6 +53,7 @@ func sendGzipJSON(client http.Client, url string, jsonData []byte) (*http.Respon
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")
+		req.Header.Set("HashSHA256", getHash(key))
 
 		resp, err := client.Do(req)
 		if err == nil {
@@ -65,21 +74,6 @@ func sendGzipJSON(client http.Client, url string, jsonData []byte) (*http.Respon
 	return nil, lastErr
 }
 
-func SendRequest(client http.Client, metric models.Metrics, url string) (*http.Response, error) {
-	jsonData, err := easyjson.Marshal(metric)
-	if err != nil {
-		fmt.Printf("Marshal error: %v\n", err)
-		return nil, err
-	}
-
-	resp, err := sendGzipJSON(client, url, jsonData)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	return resp, nil
-}
-
 func SendBatchRequest(client http.Client, config Config, metrics models.MetricsList) (*http.Response, error) {
 	url := fmt.Sprintf("%s/updates/", config.RunAddr)
 
@@ -89,7 +83,7 @@ func SendBatchRequest(client http.Client, config Config, metrics models.MetricsL
 		return nil, err
 	}
 
-	resp, err := sendGzipJSON(client, url, jsonData)
+	resp, err := sendGzipJSON(client, url, jsonData, config.Key)
 	if err != nil {
 		return nil, err
 	}

@@ -16,6 +16,7 @@ import (
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
 	repo "github.com/postman17/metrics/internal/repository"
+	sha256mw "github.com/postman17/metrics/internal/sha256"
 )
 
 func main() {
@@ -44,6 +45,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
 	r.Use(gzip.GZIPMiddleware)
+	r.Use(sha256mw.Middleware(config.Key))
 
 	if db != nil {
 		r.Get("/ping", handlers.Ping(db))

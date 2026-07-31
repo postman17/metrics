@@ -12,6 +12,7 @@ type Config struct {
 	ReportInterval int64  `env:"REPORT_INTERVAL"`
 	PollInterval   int64  `env:"POLL_INTERVAL"`
 	RunAddr        string `env:"ADDRESS"`
+	Key            string `env:"KEY"`
 }
 
 func addPrefix(s string) string {
@@ -26,11 +27,13 @@ func parseFlags() Config {
 		reportInterval int64
 		pollInterval   int64
 		runAddr        string
+		key            string
 	)
 
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 	flag.Int64Var(&reportInterval, "r", 10, "reportInterval")
 	flag.Int64Var(&pollInterval, "p", 2, "pollInterval")
+	flag.StringVar(&key, "k", "", "key")
 	flag.Parse()
 
 	cfg := Config{}
@@ -46,10 +49,14 @@ func parseFlags() Config {
 	if cfg.PollInterval != 0 {
 		pollInterval = cfg.PollInterval
 	}
+	if cfg.Key != "" {
+		key = cfg.Key
+	}
 
 	return Config{
 		ReportInterval: reportInterval,
 		PollInterval:   pollInterval,
 		RunAddr:        addPrefix(runAddr),
+		Key:            key,
 	}
 }
