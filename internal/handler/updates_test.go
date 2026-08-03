@@ -2,12 +2,15 @@ package handler
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/mailru/easyjson"
 	"github.com/postman17/metrics/internal/audit"
+	models "github.com/postman17/metrics/internal/model"
 	repo "github.com/postman17/metrics/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
@@ -168,4 +171,178 @@ func TestUpdatesMetricCounterAccumulation(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, int64(13), memory.GetTypeValue("PollCount"))
+}
+
+func BenchmarkUpdatesMetric(b *testing.B) {
+	benchmarks := []struct {
+		name  string
+		count int
+	}{
+		{"1_metric", 1},
+		{"10_metrics", 10},
+		{"100_metrics", 100},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			list := make(models.MetricsList, 0, bm.count)
+			for i := 0; i < bm.count; i++ {
+				v := float64(i) + 0.5
+				list = append(list, models.Metrics{
+					ID:    fmt.Sprintf("gauge_%d", i),
+					MType: models.Gauge,
+					Value: &v,
+				})
+			}
+
+			body, err := easyjson.Marshal(list)
+			if err != nil {
+				b.Fatalf("failed to marshal: %v", err)
+			}
+
+			memory := repo.NewMemStorage()
+			pub := &audit.Pub{}
+			handler := UpdatesMetric(memory, *pub)
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				handler(w, req)
+				if w.Code != http.StatusOK {
+					b.Fatalf("unexpected status code: %d", w.Code)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkUpdatesMetricMixed(b *testing.B) {
+	benchmarks := []struct {
+		name  string
+		count int
+	}{
+		{"10_mixed", 10},
+		{"100_mixed", 100},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			list := make(models.MetricsList, 0, bm.count)
+			for i := 0; i < bm.count; i++ {
+				if i%2 == 0 {
+					v := float64(i) + 0.5
+					list = append(list, models.Metrics{
+						ID:    fmt.Sprintf("gauge_%d", i),
+						MType: models.Gauge,
+						Value: &v,
+					})
+				} else {
+					d := int64(i)
+					list = append(list, models.Metrics{
+						ID:    fmt.Sprintf("counter_%d", i),
+						MType: models.Counter,
+						Delta: &d,
+					})
+				}
+			}
+
+			body, err := easyjson.Marshal(list)
+			if err != nil {
+				b.Fatalf("failed to marshal: %v", err)
+			}
+
+			memory := repo.NewMemStorage()
+			pub := &audit.Pub{}
+			handler := UpdatesMetric(memory, *pub)
+
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				w := httptest.NewRecorder()
+				handler(w, req)
+				if w.Code != http.StatusOK {
+					b.Fatalf("unexpected status code: %d", w.Code)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkUpdatesMetricCounterAccumulation(b *testing.B) {
+	d := int64(1)
+	list := models.MetricsList{
+		{
+			ID:    "PollCount",
+			MType: models.Counter,
+			Delta: &d,
+		},
+	}
+
+	body, err := easyjson.Marshal(list)
+	if err != nil {
+		b.Fatalf("failed to marshal: %v", err)
+	}
+
+	memory := repo.NewMemStorage()
+	pub := &audit.Pub{}
+	handler := UpdatesMetric(memory, *pub)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler(w, req)
+		if w.Code != http.StatusOK {
+			b.Fatalf("unexpected status code: %d", w.Code)
+		}
+	}
+}
+
+func BenchmarkUpdatesMetricMethodNotAllowed(b *testing.B) {
+	memory := repo.NewMemStorage()
+	pub := &audit.Pub{}
+	handler := UpdatesMetric(memory, *pub)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/updates", nil)
+		w := httptest.NewRecorder()
+		handler(w, req)
+		if w.Code != http.StatusMethodNotAllowed {
+			b.Fatalf("unexpected status code: %d", w.Code)
+		}
+	}
+}
+
+func BenchmarkUpdatesMetricInvalidJSON(b *testing.B) {
+	body := []byte(`{invalid`)
+
+	memory := repo.NewMemStorage()
+	pub := &audit.Pub{}
+	handler := UpdatesMetric(memory, *pub)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/updates", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		handler(w, req)
+		if w.Code != http.StatusBadRequest {
+			b.Fatalf("unexpected status code: %d", w.Code)
+		}
+	}
 }
