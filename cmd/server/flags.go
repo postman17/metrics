@@ -12,7 +12,7 @@ type Config struct {
 	StoreInterval   *int64 `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool  `env:"RESTORE"`
-	DatabaseDSN    string `env:"DATABASE_DSN"`
+	DatabaseDSN     string `env:"DATABASE_DSN"`
 	Key             string `env:"KEY"`
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
@@ -76,7 +76,7 @@ func parseFlags() Config {
 		StoreInterval:   &storeInterval,
 		FileStoragePath: fileStoragePath,
 		Restore:         &restore,
-		DatabaseDSN:    dbDsn,
+		DatabaseDSN:     dbDsn,
 		Key:             key,
 		AuditFile:       auditFile,
 		AuditURL:        auditURL,

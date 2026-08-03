@@ -4,8 +4,8 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
-	"runtime"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 

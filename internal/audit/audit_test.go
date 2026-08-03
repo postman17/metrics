@@ -9,10 +9,10 @@ import (
 )
 
 type mockObserver struct {
-	id      string
-	lastIP  string
+	id          string
+	lastIP      string
 	lastMetrics []string
-	sendErr error
+	sendErr     error
 }
 
 func (m *mockObserver) send(ip string, metrics []string) error {
