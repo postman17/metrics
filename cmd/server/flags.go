@@ -7,6 +7,9 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// Config содержит параметры конфигурации сервера: адрес, интервал сохранения,
+// путь к файлу хранилища, флаг восстановления, DSN БД, ключ подписи,
+// а также параметры аудита.
 type Config struct {
 	RunAddr         string `env:"ADDRESS"`
 	StoreInterval   *int64 `env:"STORE_INTERVAL"`

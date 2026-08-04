@@ -6,17 +6,20 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+// MemStorage — in-memory хранилище метрик, защищённое мьютексом.
 type MemStorage struct {
 	data map[string]any
 	mu   sync.Mutex
 }
 
+// NewMemStorage создаёт пустое in-memory хранилище метрик.
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
 		data: make(map[string]any),
 	}
 }
 
+// NewMemStorageWithData создаёт in-memory хранилище, инициализированное переданными данными.
 func NewMemStorageWithData(data map[string]any) *MemStorage {
 	m := NewMemStorage()
 	m.mu.Lock()
@@ -27,12 +30,14 @@ func NewMemStorageWithData(data map[string]any) *MemStorage {
 	return m
 }
 
+// AddGauge добавляет или перезаписывает gauge-метрику.
 func (m *MemStorage) AddGauge(name string, value float64) {
 	m.mu.Lock()
 	m.data[name] = value
 	m.mu.Unlock()
 }
 
+// CheckGaugeType возвращает true, если метрика name существует и имеет тип gauge.
 func (m *MemStorage) CheckGaugeType(name string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -41,6 +46,7 @@ func (m *MemStorage) CheckGaugeType(name string) bool {
 	return ok && okType
 }
 
+// AddCounter увеличивает counter-метрику на value; если метрика не существует, создаёт её.
 func (m *MemStorage) AddCounter(name string, value int64) {
 	m.mu.Lock()
 	oldValue, ok := m.data[name].(int64)
@@ -52,6 +58,7 @@ func (m *MemStorage) AddCounter(name string, value int64) {
 	m.mu.Unlock()
 }
 
+// CheckCounterType возвращает true, если метрика name существует и имеет тип counter.
 func (m *MemStorage) CheckCounterType(name string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -60,6 +67,7 @@ func (m *MemStorage) CheckCounterType(name string) bool {
 	return ok && okType
 }
 
+// GetTypeValue возвращает значение метрики name или nil, если она не найдена.
 func (m *MemStorage) GetTypeValue(name string) any {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -70,6 +78,7 @@ func (m *MemStorage) GetTypeValue(name string) any {
 	return val
 }
 
+// GetAll возвращает копию всех метрик в виде map[name]value.
 func (m *MemStorage) GetAll() map[string]any {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -80,6 +89,7 @@ func (m *MemStorage) GetAll() map[string]any {
 	return result
 }
 
+// AddBatch добавляет срез метрик; валидирует данные перед записью.
 func (m *MemStorage) AddBatch(data models.MetricsList) error {
 	if err := validateBatch(data); err != nil {
 		return err

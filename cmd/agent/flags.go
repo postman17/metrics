@@ -8,6 +8,8 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// Config содержит параметры конфигурации агента: интервалы опроса/отправки,
+// адрес сервера и ключ подписи.
 type Config struct {
 	ReportInterval int64  `env:"REPORT_INTERVAL"`
 	PollInterval   int64  `env:"POLL_INTERVAL"`

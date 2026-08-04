@@ -1,3 +1,5 @@
+// Package sha256 предоставляет middleware для проверки целостности запросов
+// по заголовку HashSHA256.
 package sha256
 
 import (
@@ -12,6 +14,8 @@ func getHash(key string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
+// Middleware возвращает middleware, проверяющее заголовок HashSHA256 запроса
+// и добавляющее его в ответ. Если key пустой, middleware неактивно (passthrough).
 func Middleware(key string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if key == "" {

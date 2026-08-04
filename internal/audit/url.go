@@ -10,6 +10,7 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+// URLSubscriber — подписчик, отправляющий аудит-события HTTP POST на внешний URL.
 type URLSubscriber struct {
 	ID  string
 	URL string

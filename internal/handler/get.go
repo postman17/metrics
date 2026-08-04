@@ -1,3 +1,6 @@
+// Package handler реализует HTTP-обработчики сервера мониторинга:
+// обновление и получение метрик в форматах plain-text и JSON,
+// главная страница со списком метрик, а также проверка связи с БД.
 package handler
 
 import (
@@ -10,6 +13,8 @@ import (
 	mem "github.com/postman17/metrics/internal/repository"
 )
 
+// GetMetricValuePage возвращает HTTP-обработчик, который отдаёт значение метрики
+// в текстовом виде по пути /value/{type}/{name}.
 func GetMetricValuePage(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -44,6 +49,8 @@ func GetMetricValuePage(storage mem.MetricsRepository) http.HandlerFunc {
 	}
 }
 
+// GetMetricValue возвращает HTTP-обработчик, который отдаёт значение метрики
+// в JSON-формате по пути /value/. Ожидает POST-запрос с JSON-телом GetMetricRequest.
 func GetMetricValue(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")

@@ -12,6 +12,8 @@ import (
 	mem "github.com/postman17/metrics/internal/repository"
 )
 
+// UpdateMetricPage возвращает HTTP-обработчик, который обновляет метрику
+// по пути /update/{type}/{name}/{value} (plain-text формат).
 func UpdateMetricPage(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -62,6 +64,8 @@ func UpdateMetricPage(storage mem.MetricsRepository) http.HandlerFunc {
 	}
 }
 
+// UpdateMetric возвращает HTTP-обработчик, который обновляет одну метрику
+// по пути /update/. Ожидает POST-запрос с JSON-телом Metrics.
 func UpdateMetric(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")

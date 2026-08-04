@@ -11,6 +11,7 @@ import (
 	projectMigrations "github.com/postman17/metrics/migrations"
 )
 
+// runMigrations применяет встроенные SQL-миграции к PostgreSQL базе данных.
 func runMigrations(db *sql.DB) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {

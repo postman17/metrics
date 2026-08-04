@@ -1,3 +1,5 @@
+// Package logger инициализирует структурированный JSON-логгер (slog)
+// и предоставляет middleware для логирования HTTP-запросов.
 package logger
 
 import (
@@ -9,6 +11,7 @@ import (
 	"time"
 )
 
+// InitializeLogger устанавливает глобальный JSON-логгер с указанным уровнем (debug, info, warn, error).
 func InitializeLogger(level string) error {
 	var slogLevel slog.Level
 	err := slogLevel.UnmarshalText([]byte(strings.ToUpper(level)))
@@ -50,6 +53,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
+// WithLogging оборачивает http.Handler, логируя каждый запрос: URI, метод, статус, длительность и размер ответа.
 func WithLogging(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

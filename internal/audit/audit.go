@@ -1,3 +1,5 @@
+// Package audit реализует паттерн «наблюдатель» для аудита операций с метриками.
+// Pub рассылает уведомления зарегистрированным подписчикам (FileSubscriber, URLSubscriber).
 package audit
 
 import (
@@ -11,10 +13,12 @@ type observer interface {
 	getID() string
 }
 
+// Pub — издатель уведомлений об обновлении метрик.
 type Pub struct {
 	observers map[string]observer
 }
 
+// Register добавляет подписчика в издатель.
 func (e *Pub) Register(o observer) {
 	if e.observers == nil {
 		e.observers = make(map[string]observer)
@@ -22,6 +26,7 @@ func (e *Pub) Register(o observer) {
 	e.observers[o.getID()] = o
 }
 
+// Notify рассылает уведомление всем подписчикам с IP-адресом клиента и списком обновлённых метрик.
 func (e *Pub) Notify(r *http.Request, metrics []string) {
 	for _, observer := range e.observers {
 		observer.send(e.getClientIP(r), metrics)
