@@ -1,3 +1,5 @@
+// Сервер мониторинга принимает метрики от агентов, хранит их
+// (in-memory, file или PostgreSQL) и отдаёт по HTTP.
 package main
 
 import (
@@ -96,6 +98,8 @@ func main() {
 	}
 }
 
+// newMetricsRepository создаёт хранилище метрик на основе конфигурации:
+// DBStorage при наличии DSN, FileStorage при указании пути к файлу, иначе MemStorage.
 func newMetricsRepository(ctx context.Context, config Config) (repo.MetricsRepository, *sql.DB, error) {
 	if config.DatabaseDSN != "" {
 		db, err := dbconfig.Open(ctx, config.DatabaseDSN)
@@ -124,6 +128,8 @@ func newMetricsRepository(ctx context.Context, config Config) (repo.MetricsRepos
 	return repo.NewMemStorage(), nil, nil
 }
 
+// runPeriodicSave периодически вызывает Save() хранилища с заданным интервалом,
+// пока контекст не будет отменён.
 func runPeriodicSave(ctx context.Context, storage repo.PersistentRepository, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

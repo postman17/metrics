@@ -1,3 +1,5 @@
+// Package db содержит вспомогательные функции для подключения к PostgreSQL,
+// включая повторные попытки при устранимых ошибках соединения.
 package db
 
 import (
@@ -13,6 +15,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+// connectRetryDelays — задержки между повторными попытками подключения к БД.
 var connectRetryDelays = []time.Duration{
 	1 * time.Second,
 	3 * time.Second,

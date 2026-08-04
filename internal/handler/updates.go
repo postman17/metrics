@@ -13,14 +13,20 @@ import (
 	mem "github.com/postman17/metrics/internal/repository"
 )
 
+// updatesBufPool — пул буферов bytes.Buffer для чтения тела запроса
+// в обработчике UpdatesMetric, уменьшает allocations.
 var updatesBufPool = sync.Pool{
 	New: func() any {
 		return new(bytes.Buffer)
 	},
 }
 
+// emptyJSON используется как тело ответа при успешном пакетном обновлении.
 var emptyJSON = []byte("{}")
 
+// UpdatesMetric возвращает HTTP-обработчик для пакетного обновления метрик
+// по пути /updates/. Ожидает POST-запрос с JSON-массивом MetricsList.
+// После записи в хранилище уведомляет подписчиков аудита (pub).
 func UpdatesMetric(storage mem.MetricsRepository, pub audit.Pub) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

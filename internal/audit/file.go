@@ -12,6 +12,7 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+// FileSubscriber — подписчик, записывающий аудит-события в файл построчно в JSON.
 type FileSubscriber struct {
 	ID       string
 	FilePath string

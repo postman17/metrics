@@ -9,11 +9,13 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+// DBStorage — хранилище метрик в PostgreSQL.
 type DBStorage struct {
 	db  *sql.DB
 	ctx context.Context
 }
 
+// NewDBStorage создаёт хранилище, использующее указанное подключение к PostgreSQL.
 func NewDBStorage(ctx context.Context, db *sql.DB) *DBStorage {
 	return &DBStorage{
 		db:  db,
@@ -21,6 +23,7 @@ func NewDBStorage(ctx context.Context, db *sql.DB) *DBStorage {
 	}
 }
 
+// AddGauge вставляет или обновляет gauge-метрику в БД (upsert).
 func (d *DBStorage) AddGauge(name string, value float64) {
 	ctx, cancel := context.WithTimeout(d.ctx, 5*time.Second)
 	defer cancel()
@@ -37,6 +40,7 @@ func (d *DBStorage) AddGauge(name string, value float64) {
 	}
 }
 
+// AddCounter вставляет или увеличивает counter-метрику в БД (upsert с накоплением delta).
 func (d *DBStorage) AddCounter(name string, value int64) {
 	ctx, cancel := context.WithTimeout(d.ctx, 5*time.Second)
 	defer cancel()
@@ -53,16 +57,19 @@ func (d *DBStorage) AddCounter(name string, value int64) {
 	}
 }
 
+// CheckGaugeType возвращает true, если метрика name существует и имеет тип gauge.
 func (d *DBStorage) CheckGaugeType(name string) bool {
 	mType, ok := d.getMetricType(name)
 	return ok && mType == models.Gauge
 }
 
+// CheckCounterType возвращает true, если метрика name существует и имеет тип counter.
 func (d *DBStorage) CheckCounterType(name string) bool {
 	mType, ok := d.getMetricType(name)
 	return ok && mType == models.Counter
 }
 
+// GetTypeValue возвращает значение метрики name из БД или nil, если она не найдена.
 func (d *DBStorage) GetTypeValue(name string) any {
 	ctx, cancel := context.WithTimeout(d.ctx, 5*time.Second)
 	defer cancel()
@@ -96,6 +103,7 @@ func (d *DBStorage) GetTypeValue(name string) any {
 	return nil
 }
 
+// GetAll возвращает все метрики из БД в виде map[name]value.
 func (d *DBStorage) GetAll() map[string]any {
 	ctx, cancel := context.WithTimeout(d.ctx, 5*time.Second)
 	defer cancel()
@@ -137,6 +145,7 @@ func (d *DBStorage) GetAll() map[string]any {
 	return result
 }
 
+// AddBatch вставляет или обновляет срез метрик в одной транзакции.
 func (d *DBStorage) AddBatch(data models.MetricsList) error {
 	if err := validateBatch(data); err != nil {
 		return err

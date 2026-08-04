@@ -1,3 +1,5 @@
+// Package gzip предоставляет middleware для прозрачной gzip-компрессии
+// HTTP-ответов и декомпрессии запросов.
 package gzip
 
 import (
@@ -87,6 +89,9 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
+// GZIPMiddleware оборачивает http.Handler, добавляя поддержку gzip-сжатия
+// ответа (если клиент передал Accept-Encoding: gzip) и декомпрессии
+// тела запроса (если клиент передал Content-Encoding: gzip).
 func GZIPMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ow := w
