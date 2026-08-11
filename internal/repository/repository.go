@@ -1,3 +1,6 @@
+// Package repository определяет интерфейсы и реализации хранилища метрик:
+// MetricsRepository — базовый CRUD, PersistentRepository — с поддержкой сохранения на диск,
+// а также in-memory, file-based и PostgreSQL реализации.
 package repository
 
 import (
@@ -6,6 +9,8 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+// MetricsRepository определяет интерфейс хранилища метрик.
+// Реализации: MemStorage, FileStorage, DBStorage.
 type MetricsRepository interface {
 	AddGauge(name string, value float64)
 	AddCounter(name string, value int64)
@@ -16,6 +21,8 @@ type MetricsRepository interface {
 	AddBatch(data models.MetricsList) error
 }
 
+// PersistentRepository расширяет MetricsRepository возможностью явного
+// сохранения состояния (например, на диск).
 type PersistentRepository interface {
 	MetricsRepository
 	Save() error

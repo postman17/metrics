@@ -8,6 +8,7 @@ import (
 	mem "github.com/postman17/metrics/internal/repository"
 )
 
+// htmlPage — HTML-шаблон главной страницы со списком всех метрик.
 const htmlPage = `
 <!DOCTYPE html>
 <html>
@@ -24,6 +25,8 @@ const htmlPage = `
 </body>
 </html>`
 
+// GetMainPage возвращает HTTP-обработчик, который отдаёт HTML-страницу
+// со списком всех метрик по пути /.
 func GetMainPage(storage mem.MetricsRepository) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

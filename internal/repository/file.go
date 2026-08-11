@@ -10,12 +10,19 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+// FileStorage — хранилище метрик с персистентностью на файловую систему.
+// Делегирует хранение в памяти объекту MemStorage и при необходимости
+// записывает/читает данные из файла.
 type FileStorage struct {
 	mem       *MemStorage
 	filePath  string
 	storeSync bool
 }
 
+// NewFileStorage создаёт файловое хранилище.
+// filePath — путь к файлу для персистентности;
+// storeSync — если true, данные сохраняются после каждой операции;
+// restore — если true, данные загружаются из файла при старте.
 func NewFileStorage(filePath string, storeSync bool, restore bool) (*FileStorage, error) {
 	if filePath == "" {
 		return nil, errEmptyFilePath()
@@ -36,32 +43,39 @@ func NewFileStorage(filePath string, storeSync bool, restore bool) (*FileStorage
 	return storage, nil
 }
 
+// AddGauge добавляет или перезаписывает gauge-метрику и при storeSync сохраняет файл.
 func (f *FileStorage) AddGauge(name string, value float64) {
 	f.mem.AddGauge(name, value)
 	f.persistIfSync()
 }
 
+// AddCounter увеличивает counter-метрику на value и при storeSync сохраняет файл.
 func (f *FileStorage) AddCounter(name string, value int64) {
 	f.mem.AddCounter(name, value)
 	f.persistIfSync()
 }
 
+// CheckGaugeType возвращает true, если метрика name имеет тип gauge.
 func (f *FileStorage) CheckGaugeType(name string) bool {
 	return f.mem.CheckGaugeType(name)
 }
 
+// CheckCounterType возвращает true, если метрика name имеет тип counter.
 func (f *FileStorage) CheckCounterType(name string) bool {
 	return f.mem.CheckCounterType(name)
 }
 
+// GetTypeValue возвращает текущее значение метрики name или nil, если она не найдена.
 func (f *FileStorage) GetTypeValue(name string) any {
 	return f.mem.GetTypeValue(name)
 }
 
+// GetAll возвращает копию всех метрик в виде map[name]value.
 func (f *FileStorage) GetAll() map[string]any {
 	return f.mem.GetAll()
 }
 
+// AddBatch добавляет срез метрик и при storeSync сохраняет файл.
 func (f *FileStorage) AddBatch(data models.MetricsList) error {
 	if err := f.mem.AddBatch(data); err != nil {
 		return err
@@ -70,6 +84,7 @@ func (f *FileStorage) AddBatch(data models.MetricsList) error {
 	return nil
 }
 
+// Save явно сохраняет текущее состояние хранилища в файл.
 func (f *FileStorage) Save() error {
 	return f.save()
 }

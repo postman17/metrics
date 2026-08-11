@@ -7,13 +7,18 @@ import (
 	"github.com/caarlos0/env/v11"
 )
 
+// Config содержит параметры конфигурации сервера: адрес, интервал сохранения,
+// путь к файлу хранилища, флаг восстановления, DSN БД, ключ подписи,
+// а также параметры аудита.
 type Config struct {
 	RunAddr         string `env:"ADDRESS"`
 	StoreInterval   *int64 `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool  `env:"RESTORE"`
-	Database_DSN    string `env:"DATABASE_DSN"`
+	DatabaseDSN     string `env:"DATABASE_DSN"`
 	Key             string `env:"KEY"`
+	AuditFile       string `env:"AUDIT_FILE"`
+	AuditURL        string `env:"AUDIT_URL"`
 }
 
 func parseFlags() Config {
@@ -24,6 +29,8 @@ func parseFlags() Config {
 		restore         bool
 		dbDsn           string
 		key             string
+		auditFile       string
+		auditURL        string
 	)
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 	flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
@@ -33,6 +40,8 @@ func parseFlags() Config {
 	// postgres://metrics_user:metrics_user_password@localhost:5432/metrics
 	flag.StringVar(&dbDsn, "d", "", "dsn database address")
 	flag.StringVar(&key, "k", "", "key")
+	flag.StringVar(&auditFile, "h", "", "audit file")
+	flag.StringVar(&auditURL, "u", "", "audit url")
 	flag.Parse()
 
 	cfg := Config{}
@@ -52,11 +61,17 @@ func parseFlags() Config {
 	if cfg.Restore != nil {
 		restore = *cfg.Restore
 	}
-	if cfg.Database_DSN != "" {
-		dbDsn = cfg.Database_DSN
+	if cfg.DatabaseDSN != "" {
+		dbDsn = cfg.DatabaseDSN
 	}
 	if cfg.Key != "" {
 		key = cfg.Key
+	}
+	if cfg.AuditFile != "" {
+		auditFile = cfg.AuditFile
+	}
+	if cfg.AuditURL != "" {
+		auditURL = cfg.AuditURL
 	}
 
 	return Config{
@@ -64,7 +79,9 @@ func parseFlags() Config {
 		StoreInterval:   &storeInterval,
 		FileStoragePath: fileStoragePath,
 		Restore:         &restore,
-		Database_DSN:    dbDsn,
+		DatabaseDSN:     dbDsn,
 		Key:             key,
+		AuditFile:       auditFile,
+		AuditURL:        auditURL,
 	}
 }

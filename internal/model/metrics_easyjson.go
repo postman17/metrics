@@ -4,6 +4,7 @@ package models
 
 import (
 	json "encoding/json"
+
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
@@ -276,4 +277,123 @@ func (v *GetMetricRequest) UnmarshalJSON(data []byte) error {
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *GetMetricRequest) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson2220f231DecodeGithubComPostman17MetricsInternalModel2(l, v)
+}
+func easyjson2220f231DecodeGithubComPostman17MetricsInternalModel3(in *jlexer.Lexer, out *AuditMetrics) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		switch key {
+		case "ts":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.TS = int64(in.Int64())
+			}
+		case "metrics":
+			if in.IsNull() {
+				in.Skip()
+				out.Metrics = nil
+			} else {
+				in.Delim('[')
+				if out.Metrics == nil {
+					if !in.IsDelim(']') {
+						out.Metrics = make([]string, 0, 4)
+					} else {
+						out.Metrics = []string{}
+					}
+				} else {
+					out.Metrics = (out.Metrics)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v4 string
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v4 = string(in.String())
+					}
+					out.Metrics = append(out.Metrics, v4)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		case "ip_address":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.IPAddress = string(in.String())
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson2220f231EncodeGithubComPostman17MetricsInternalModel3(out *jwriter.Writer, in AuditMetrics) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"ts\":"
+		out.RawString(prefix[1:])
+		out.Int64(int64(in.TS))
+	}
+	{
+		const prefix string = ",\"metrics\":"
+		out.RawString(prefix)
+		if in.Metrics == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+			out.RawString("null")
+		} else {
+			out.RawByte('[')
+			for v5, v6 := range in.Metrics {
+				if v5 > 0 {
+					out.RawByte(',')
+				}
+				out.String(string(v6))
+			}
+			out.RawByte(']')
+		}
+	}
+	{
+		const prefix string = ",\"ip_address\":"
+		out.RawString(prefix)
+		out.String(string(in.IPAddress))
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v AuditMetrics) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson2220f231EncodeGithubComPostman17MetricsInternalModel3(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v AuditMetrics) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson2220f231EncodeGithubComPostman17MetricsInternalModel3(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *AuditMetrics) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson2220f231DecodeGithubComPostman17MetricsInternalModel3(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *AuditMetrics) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson2220f231DecodeGithubComPostman17MetricsInternalModel3(l, v)
 }

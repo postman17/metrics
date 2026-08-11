@@ -1,3 +1,5 @@
+// Сервер мониторинга принимает метрики от агентов, хранит их
+// (in-memory, file или PostgreSQL) и отдаёт по HTTP.
 package main
 
 import (
@@ -11,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	audit "github.com/postman17/metrics/internal/audit"
 	dbconfig "github.com/postman17/metrics/internal/config/db"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
@@ -42,6 +45,14 @@ func main() {
 		go runPeriodicSave(appCtx, persistent, time.Duration(*config.StoreInterval)*time.Second)
 	}
 
+	pub := audit.Pub{}
+	if config.AuditFile != "" {
+		pub.Register(&audit.FileSubscriber{ID: "file", FilePath: config.AuditFile})
+	}
+	if config.AuditURL != "" {
+		pub.Register(audit.NewURLSubscriber("url", config.AuditURL))
+	}
+
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
 	r.Use(gzip.GZIPMiddleware)
@@ -56,7 +67,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(storage))
 	r.Post("/value/", handlers.GetMetricValue(storage))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(storage))
-	r.Post("/updates/", handlers.UpdatesMetric(storage))
+	r.Post("/updates/", handlers.UpdatesMetric(storage, &pub))
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
@@ -87,9 +98,11 @@ func main() {
 	}
 }
 
+// newMetricsRepository создаёт хранилище метрик на основе конфигурации:
+// DBStorage при наличии DSN, FileStorage при указании пути к файлу, иначе MemStorage.
 func newMetricsRepository(ctx context.Context, config Config) (repo.MetricsRepository, *sql.DB, error) {
-	if config.Database_DSN != "" {
-		db, err := dbconfig.Open(ctx, config.Database_DSN)
+	if config.DatabaseDSN != "" {
+		db, err := dbconfig.Open(ctx, config.DatabaseDSN)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -115,6 +128,8 @@ func newMetricsRepository(ctx context.Context, config Config) (repo.MetricsRepos
 	return repo.NewMemStorage(), nil, nil
 }
 
+// runPeriodicSave периодически вызывает Save() хранилища с заданным интервалом,
+// пока контекст не будет отменён.
 func runPeriodicSave(ctx context.Context, storage repo.PersistentRepository, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

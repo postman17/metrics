@@ -1,3 +1,5 @@
+// Агент собирает runtime-метрики Go (runtime.MemStats) и периодически
+// отправляет их на сервер мониторинга пакетными POST-запросами.
 package main
 
 import (
@@ -17,6 +19,7 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+// sendGzipJSONRetryDelays — задержки между повторными попытками отправки HTTP-запроса.
 var sendGzipJSONRetryDelays = []time.Duration{
 	1 * time.Second,
 	3 * time.Second,
@@ -74,6 +77,8 @@ func sendGzipJSON(client http.Client, url string, jsonData []byte, key string) (
 	return nil, lastErr
 }
 
+// SendBatchRequest отправляет срез метрик на сервер пакетным POST-запросом
+// по пути /updates/ с gzip-сжатием тела и подписью HashSHA256.
 func SendBatchRequest(client http.Client, config Config, metrics models.MetricsList) (*http.Response, error) {
 	url := fmt.Sprintf("%s/updates/", config.RunAddr)
 
@@ -87,7 +92,6 @@ func SendBatchRequest(client http.Client, config Config, metrics models.MetricsL
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 	return resp, nil
 }
 
@@ -160,9 +164,11 @@ func main() {
 			runtime.ReadMemStats(&m)
 			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
-			_, err := SendBatchRequest(*client, config, runtimeMetrics(&m))
+			resp, err := SendBatchRequest(*client, config, runtimeMetrics(&m))
 			if err != nil {
 				slog.Error("Send batch metrics error", "err", err)
+			} else {
+				resp.Body.Close()
 			}
 			slog.Info("Slow tic:", "time", t2)
 		}
