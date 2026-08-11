@@ -79,7 +79,7 @@ func UpdateMetric(storage mem.MetricsRepository) http.HandlerFunc {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		defer r.Body.Close()
+		defer func() { _ = r.Body.Close() }()
 
 		var req models.Metrics
 		if err := easyjson.Unmarshal(body, &req); err != nil {

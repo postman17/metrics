@@ -115,7 +115,7 @@ func TestUpdatesMetric(t *testing.T) {
 			if !assert.NoError(t, err, "error making HTTP request") {
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedCode, resp.StatusCode)
 
@@ -141,7 +141,7 @@ func TestUpdatesMetricSuccess(t *testing.T) {
 	UpdatesMetric(memory, pub)(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -167,7 +167,7 @@ func TestUpdatesMetricCounterAccumulation(t *testing.T) {
 	UpdatesMetric(memory, pub)(w, req)
 
 	res := w.Result()
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, int64(13), memory.GetTypeValue("PollCount"))

@@ -45,7 +45,7 @@ func TestSendBatchRequest_MockTransport(t *testing.T) {
 	resp, err := SendBatchRequest(*client, config, metrics)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }
@@ -61,7 +61,7 @@ func TestSendBatchRequest_GzipPayload(t *testing.T) {
 
 		gzReader, err := gzip.NewReader(r.Body)
 		require.NoError(t, err)
-		defer gzReader.Close()
+		defer func() { _ = gzReader.Close() }()
 
 		body, err := io.ReadAll(gzReader)
 		require.NoError(t, err)
@@ -79,7 +79,8 @@ func TestSendBatchRequest_GzipPayload(t *testing.T) {
 
 	resp, err := SendBatchRequest(http.Client{}, config, metrics)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	require.NotNil(t, resp)
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Len(t, received, 2)

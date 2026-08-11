@@ -38,9 +38,9 @@ func GetMetricValuePage(storage mem.MetricsRepository) http.HandlerFunc {
 			return
 		}
 		if metricType == "gauge" {
-			rw.Write([]byte(fmt.Sprintf("%g", value)))
+			_, _ = rw.Write([]byte(fmt.Sprintf("%g", value)))
 		} else {
-			rw.Write([]byte(fmt.Sprintf("%d", value)))
+			_, _ = rw.Write([]byte(fmt.Sprintf("%d", value)))
 		}
 
 		rw.Header().Set("Content-Type", "text/plain")

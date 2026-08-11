@@ -37,7 +37,7 @@ func UpdatesMetric(storage mem.MetricsRepository, pub *audit.Pub) http.HandlerFu
 		buf := updatesBufPool.Get().(*bytes.Buffer)
 		buf.Reset()
 		_, err := io.Copy(buf, r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 		if err != nil {
 			updatesBufPool.Put(buf)
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -45,7 +45,7 @@ func UpdatesMetric(storage mem.MetricsRepository, pub *audit.Pub) http.HandlerFu
 		}
 
 		var req models.MetricsList
-		if err := easyjson.Unmarshal(buf.Bytes(), &req); err != nil {
+		if unmarshalErr := easyjson.Unmarshal(buf.Bytes(), &req); unmarshalErr != nil {
 			updatesBufPool.Put(buf)
 			rw.WriteHeader(http.StatusBadRequest)
 			return

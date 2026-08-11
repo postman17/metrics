@@ -88,7 +88,7 @@ func TestUpdateHandlerSuccess(t *testing.T) {
 		res := w.Result()
 		assert.Equal(t, tt.want.code, res.StatusCode)
 
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		_, err := io.ReadAll(res.Body)
 
 		require.NoError(t, err)
@@ -185,7 +185,7 @@ func TestUpdateHandlerErrors(t *testing.T) {
 		res := w.Result()
 		assert.Equal(t, tt.want.code, res.StatusCode)
 
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		_, err := io.ReadAll(res.Body)
 
 		require.NoError(t, err)
@@ -265,7 +265,7 @@ func TestUpdateMetric(t *testing.T) {
 			if !assert.NoError(t, err, "error making HTTP request") {
 				return
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			assert.Equal(t, tc.expectedCode, resp.StatusCode, "Response code didn't match expected")
 
