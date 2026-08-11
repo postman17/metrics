@@ -12,7 +12,7 @@ import (
 )
 
 func TestURLSubscriber_getID(t *testing.T) {
-	s := &URLSubscriber{ID: "url-1", URL: "http://example.com"}
+	s := NewURLSubscriber("url-1", "http://example.com")
 	assert.Equal(t, "url-1", s.getID())
 }
 
@@ -28,7 +28,7 @@ func TestURLSubscriber_send(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		s := &URLSubscriber{ID: "url-1", URL: srv.URL}
+		s := NewURLSubscriber("url-1", srv.URL)
 		err := s.send("192.168.1.1", []string{"cpu", "mem"})
 		require.NoError(t, err)
 
@@ -44,20 +44,20 @@ func TestURLSubscriber_send(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		s := &URLSubscriber{ID: "url-2", URL: srv.URL}
+		s := NewURLSubscriber("url-2", srv.URL)
 		err := s.send("10.0.0.1", []string{"cpu"})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "bad status code")
 	})
 
 	t.Run("returns error on unreachable url", func(t *testing.T) {
-		s := &URLSubscriber{ID: "url-3", URL: "http://127.0.0.1:1"}
+		s := NewURLSubscriber("url-3", "http://127.0.0.1:1")
 		err := s.send("10.0.0.1", []string{"cpu"})
 		assert.Error(t, err)
 	})
 
 	t.Run("returns error on invalid url", func(t *testing.T) {
-		s := &URLSubscriber{ID: "url-4", URL: "http://invalid-host-that-does-not-exist.local/audit"}
+		s := NewURLSubscriber("url-4", "http://invalid-host-that-does-not-exist.local/audit")
 		err := s.send("10.0.0.1", []string{"cpu"})
 		assert.Error(t, err)
 	})
@@ -78,7 +78,7 @@ func TestURLSubscriber_send(t *testing.T) {
 				}))
 				defer srv.Close()
 
-				s := &URLSubscriber{ID: "url-5", URL: srv.URL}
+				s := NewURLSubscriber("url-5", srv.URL)
 				err := s.send("10.0.0.1", []string{"cpu"})
 				assert.NoError(t, err)
 			})
@@ -102,7 +102,7 @@ func TestURLSubscriber_send(t *testing.T) {
 				}))
 				defer srv.Close()
 
-				s := &URLSubscriber{ID: "url-6", URL: srv.URL}
+				s := NewURLSubscriber("url-6", srv.URL)
 				err := s.send("10.0.0.1", []string{"cpu"})
 				assert.Error(t, err)
 				assert.True(t, strings.Contains(err.Error(), "bad status code"))

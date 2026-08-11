@@ -14,6 +14,18 @@ import (
 type URLSubscriber struct {
 	ID  string
 	URL string
+	client *http.Client
+}
+
+// NewURLSubscriber создаёт URLSubscriber с HTTP-клиентом, имеющим таймаут.
+func NewURLSubscriber(id, url string) *URLSubscriber {
+	return &URLSubscriber{
+		ID:  id,
+		URL: url,
+		client: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+	}
 }
 
 func (s *URLSubscriber) getID() string {
@@ -30,7 +42,7 @@ func (s *URLSubscriber) send(ip string, metrics []string) error {
 
 	body := bytes.NewBuffer(data)
 
-	resp, err := http.Post(s.URL, "application/json", body)
+	resp, err := s.client.Post(s.URL, "application/json", body)
 	if err != nil {
 		return fmt.Errorf("failed to send POST request to %s: %w", s.URL, err)
 	}

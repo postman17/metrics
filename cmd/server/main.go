@@ -50,7 +50,7 @@ func main() {
 		pub.Register(&audit.FileSubscriber{ID: "file", FilePath: config.AuditFile})
 	}
 	if config.AuditURL != "" {
-		pub.Register(&audit.URLSubscriber{ID: "url", URL: config.AuditURL})
+		pub.Register(audit.NewURLSubscriber("url", config.AuditURL))
 	}
 
 	r := chi.NewRouter()
@@ -67,7 +67,7 @@ func main() {
 	r.Post("/update/{type}/{name}/{value}", handlers.UpdateMetricPage(storage))
 	r.Post("/value/", handlers.GetMetricValue(storage))
 	r.Get("/value/{type}/{name}", handlers.GetMetricValuePage(storage))
-	r.Post("/updates/", handlers.UpdatesMetric(storage, pub))
+	r.Post("/updates/", handlers.UpdatesMetric(storage, &pub))
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 

@@ -3,6 +3,7 @@ package audit
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,11 +14,13 @@ type mockObserver struct {
 	lastIP      string
 	lastMetrics []string
 	sendErr     error
+	wg          sync.WaitGroup
 }
 
 func (m *mockObserver) send(ip string, metrics []string) error {
 	m.lastIP = ip
 	m.lastMetrics = metrics
+	m.wg.Done()
 	return m.sendErr
 }
 
@@ -73,7 +76,11 @@ func TestPub_Notify(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/test", nil)
 	req.RemoteAddr = "192.168.1.1:1234"
 
+	obs1.wg.Add(1)
+	obs2.wg.Add(1)
 	pub.Notify(req, metrics)
+	obs1.wg.Wait()
+	obs2.wg.Wait()
 
 	assert.Equal(t, metrics, obs1.lastMetrics)
 	assert.Equal(t, metrics, obs2.lastMetrics)

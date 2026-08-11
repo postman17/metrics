@@ -53,10 +53,6 @@ func (s *FileSubscriber) send(ip string, metrics []string) error {
 		return fmt.Errorf("failed to write newline separator: %w", err)
 	}
 
-	if err := file.Sync(); err != nil {
-		return fmt.Errorf("failed to sync file to disk: %w", err)
-	}
-
-	slog.Info("Data safely appended to file", "path", s.FilePath)
+	slog.Info("Data appended to file", "path", s.FilePath)
 	return nil
 }

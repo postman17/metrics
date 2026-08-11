@@ -29,7 +29,9 @@ func (e *Pub) Register(o observer) {
 // Notify рассылает уведомление всем подписчикам с IP-адресом клиента и списком обновлённых метрик.
 func (e *Pub) Notify(r *http.Request, metrics []string) {
 	for _, observer := range e.observers {
-		observer.send(e.getClientIP(r), metrics)
+		go func() {
+			observer.send(e.getClientIP(r), metrics)
+		}()
 	}
 }
 

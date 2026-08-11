@@ -185,7 +185,7 @@ func ExampleUpdatesMetric() {
 	storage := repo.NewMemStorage()
 	pub := &audit.Pub{}
 
-	srv := httptest.NewServer(http.HandlerFunc(UpdatesMetric(storage, *pub)))
+	srv := httptest.NewServer(http.HandlerFunc(UpdatesMetric(storage, pub)))
 	defer srv.Close()
 
 	batch := models.MetricsList{
@@ -220,7 +220,7 @@ func ExampleUpdatesMetric_counterAccumulation() {
 	storage := repo.NewMemStorage()
 	pub := &audit.Pub{}
 
-	srv := httptest.NewServer(http.HandlerFunc(UpdatesMetric(storage, *pub)))
+	srv := httptest.NewServer(http.HandlerFunc(UpdatesMetric(storage, pub)))
 	defer srv.Close()
 
 	// Первый батч: PollCount = 5
@@ -251,7 +251,7 @@ func ExampleUpdatesMetric_invalidMetric() {
 	storage := repo.NewMemStorage()
 	pub := &audit.Pub{}
 
-	srv := httptest.NewServer(http.HandlerFunc(UpdatesMetric(storage, *pub)))
+	srv := httptest.NewServer(http.HandlerFunc(UpdatesMetric(storage, pub)))
 	defer srv.Close()
 
 	// ID пустой — сервер вернёт 400, вся транзакция отменена

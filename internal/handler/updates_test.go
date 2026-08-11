@@ -18,7 +18,7 @@ import (
 func TestUpdatesMetric(t *testing.T) {
 	memory := repo.NewMemStorage()
 	pub := &audit.Pub{}
-	handler := http.HandlerFunc(UpdatesMetric(memory, *pub))
+	handler := http.HandlerFunc(UpdatesMetric(memory, pub))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -138,7 +138,7 @@ func TestUpdatesMetricSuccess(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	UpdatesMetric(memory, *pub)(w, req)
+	UpdatesMetric(memory, pub)(w, req)
 
 	res := w.Result()
 	defer res.Body.Close()
@@ -164,7 +164,7 @@ func TestUpdatesMetricCounterAccumulation(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	UpdatesMetric(memory, *pub)(w, req)
+	UpdatesMetric(memory, pub)(w, req)
 
 	res := w.Result()
 	defer res.Body.Close()
@@ -202,7 +202,7 @@ func BenchmarkUpdatesMetric(b *testing.B) {
 
 			memory := repo.NewMemStorage()
 			pub := &audit.Pub{}
-			handler := UpdatesMetric(memory, *pub)
+			handler := UpdatesMetric(memory, pub)
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -257,7 +257,7 @@ func BenchmarkUpdatesMetricMixed(b *testing.B) {
 
 			memory := repo.NewMemStorage()
 			pub := &audit.Pub{}
-			handler := UpdatesMetric(memory, *pub)
+			handler := UpdatesMetric(memory, pub)
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -292,7 +292,7 @@ func BenchmarkUpdatesMetricCounterAccumulation(b *testing.B) {
 
 	memory := repo.NewMemStorage()
 	pub := &audit.Pub{}
-	handler := UpdatesMetric(memory, *pub)
+	handler := UpdatesMetric(memory, pub)
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -311,7 +311,7 @@ func BenchmarkUpdatesMetricCounterAccumulation(b *testing.B) {
 func BenchmarkUpdatesMetricMethodNotAllowed(b *testing.B) {
 	memory := repo.NewMemStorage()
 	pub := &audit.Pub{}
-	handler := UpdatesMetric(memory, *pub)
+	handler := UpdatesMetric(memory, pub)
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -331,7 +331,7 @@ func BenchmarkUpdatesMetricInvalidJSON(b *testing.B) {
 
 	memory := repo.NewMemStorage()
 	pub := &audit.Pub{}
-	handler := UpdatesMetric(memory, *pub)
+	handler := UpdatesMetric(memory, pub)
 
 	b.ResetTimer()
 	b.ReportAllocs()

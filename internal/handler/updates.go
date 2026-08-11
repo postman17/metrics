@@ -27,7 +27,7 @@ var emptyJSON = []byte("{}")
 // UpdatesMetric возвращает HTTP-обработчик для пакетного обновления метрик
 // по пути /updates/. Ожидает POST-запрос с JSON-массивом MetricsList.
 // После записи в хранилище уведомляет подписчиков аудита (pub).
-func UpdatesMetric(storage mem.MetricsRepository, pub audit.Pub) http.HandlerFunc {
+func UpdatesMetric(storage mem.MetricsRepository, pub *audit.Pub) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
