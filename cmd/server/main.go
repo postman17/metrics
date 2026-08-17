@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,7 +23,25 @@ import (
 	sha256mw "github.com/postman17/metrics/internal/sha256"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	fmt.Println("Build version:", buildVersion)
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	fmt.Println("Build date:", buildDate)
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+	fmt.Println("Build commit:", buildCommit)
 	if err := run(); err != nil {
 		fail(1)
 	}
