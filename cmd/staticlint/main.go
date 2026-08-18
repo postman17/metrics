@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,12 +42,14 @@ func readConfig() ([]byte, error) {
 func main() {
 	data, err := readConfig()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Read config error: %v", err)
+		os.Exit(1)
 	}
 	var cfg ConfigData
 	err = yaml.Unmarshal([]byte(data), &cfg)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Unmarshal error: %v", err)
+		os.Exit(1)
 	}
 	mychecks := []*analysis.Analyzer{
 		printf.Analyzer,
@@ -66,7 +69,8 @@ func main() {
 		}
 	}
 	if err := config.Analyzer.Flags.Set(config.ExcludePkgsFlag, "compress/gzip,go/parser,go/printer,go/types,go/ast,go/doc,go.uber.org/nilaway,golang.org/x/tools"); err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Flags error: %v", err)
+		os.Exit(1)
 	}
 	multichecker.Main(
 		mychecks...,

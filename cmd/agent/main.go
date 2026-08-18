@@ -41,9 +41,6 @@ func getHash(key string) string {
 func sendGzipJSON(client http.Client, url string, jsonData []byte, key string) (*http.Response, error) {
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
-	if gzWriter == nil {
-		return nil, fmt.Errorf("gzip.NewWriter returned nil")
-	}
 	if _, err := gzWriter.Write(jsonData); err != nil {
 		slog.Error("Gzip error", "err", err)
 		return nil, err

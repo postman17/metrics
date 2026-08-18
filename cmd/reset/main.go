@@ -7,7 +7,6 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -62,6 +61,11 @@ func parseDirRecursive(fset *token.FileSet, root string) (map[string]*ast.Packag
 			return nil
 		}
 
+		rel, _ := filepath.Rel(root, path)
+		if rel == "cmd" || strings.HasPrefix(rel, "cmd"+string(filepath.Separator)) {
+			return fs.SkipDir
+		}
+
 		pkgs, err := parser.ParseDir(fset, path, func(fi fs.FileInfo) bool {
 			return !strings.HasSuffix(fi.Name(), "_test.go") && !strings.HasSuffix(fi.Name(), ".gen.go")
 		}, parser.ParseComments)
@@ -69,10 +73,7 @@ func parseDirRecursive(fset *token.FileSet, root string) (map[string]*ast.Packag
 			return nil
 		}
 
-		for name, pkg := range pkgs {
-			if name == "main" {
-				continue
-			}
+		for _, pkg := range pkgs {
 			result[path] = pkg
 		}
 		return nil
@@ -272,5 +273,3 @@ func zeroValueForExpr(expr ast.Expr) string {
 	}
 	return "nil"
 }
-
-var _ = types.Info{}

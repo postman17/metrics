@@ -43,6 +43,7 @@ func main() {
 	}
 	fmt.Println("Build commit:", buildCommit)
 	if err := run(); err != nil {
+		slog.Error("app run error", "err", err)
 		fail(1)
 	}
 }
