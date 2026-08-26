@@ -3,6 +3,7 @@
 package audit
 
 import (
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -30,7 +31,9 @@ func (e *Pub) Register(o observer) {
 func (e *Pub) Notify(r *http.Request, metrics []string) {
 	for _, observer := range e.observers {
 		go func() {
-			observer.send(e.getClientIP(r), metrics)
+			if err := observer.send(e.getClientIP(r), metrics); err != nil {
+				slog.Error("audit observer send failed", "id", observer.getID(), "err", err)
+			}
 		}()
 	}
 }

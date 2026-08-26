@@ -40,7 +40,7 @@ func TestGzipCompression(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		b, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestGzipCompression(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		zr, err := gzip.NewReader(resp.Body)
 		require.NoError(t, err)

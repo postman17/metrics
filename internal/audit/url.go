@@ -46,7 +46,10 @@ func (s *URLSubscriber) send(ip string, metrics []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to send POST request to %s: %w", s.URL, err)
 	}
-	defer resp.Body.Close()
+	if resp == nil {
+		return fmt.Errorf("nil response from POST request to %s", s.URL)
+	}
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("bad status code from subscriber %s: %d", s.URL, resp.StatusCode)

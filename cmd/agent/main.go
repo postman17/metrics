@@ -19,6 +19,12 @@ import (
 	models "github.com/postman17/metrics/internal/model"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 // sendGzipJSONRetryDelays — задержки между повторными попытками отправки HTTP-запроса.
 var sendGzipJSONRetryDelays = []time.Duration{
 	1 * time.Second,
@@ -148,6 +154,19 @@ func runtimeMetrics(m *runtime.MemStats) models.MetricsList {
 }
 
 func main() {
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	fmt.Println("Build version:", buildVersion)
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	fmt.Println("Build date:", buildDate)
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+	fmt.Println("Build commit:", buildCommit)
+
 	config := parseFlags()
 
 	tickerPoll := time.NewTicker(time.Duration(config.PollInterval) * time.Second)
@@ -168,7 +187,7 @@ func main() {
 			if err != nil {
 				slog.Error("Send batch metrics error", "err", err)
 			} else {
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 			slog.Info("Slow tic:", "time", t2)
 		}

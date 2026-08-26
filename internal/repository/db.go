@@ -113,7 +113,7 @@ func (d *DBStorage) GetAll() map[string]any {
 		slog.Error("cant read metrics from db", "err", err)
 		return map[string]any{}
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[string]any)
 	for rows.Next() {
@@ -172,7 +172,7 @@ func (d *DBStorage) AddBatch(data models.MetricsList) error {
 	if err != nil {
 		return err
 	}
-	defer stmtGauge.Close()
+	defer func() { _ = stmtGauge.Close() }()
 
 	stmtCounter, err := tx.PrepareContext(txCtx, `
 		INSERT INTO metrics (name, m_type, delta, value) VALUES ($1, 'counter', $2, 0)
@@ -184,7 +184,7 @@ func (d *DBStorage) AddBatch(data models.MetricsList) error {
 	if err != nil {
 		return err
 	}
-	defer stmtCounter.Close()
+	defer func() { _ = stmtCounter.Close() }()
 
 	for _, metric := range data {
 		switch metric.MType {

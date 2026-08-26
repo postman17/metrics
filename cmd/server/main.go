@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,10 +23,39 @@ import (
 	sha256mw "github.com/postman17/metrics/internal/sha256"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	fmt.Println("Build version:", buildVersion)
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	fmt.Println("Build date:", buildDate)
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+	fmt.Println("Build commit:", buildCommit)
+	if err := run(); err != nil {
+		slog.Error("app run error", "err", err)
+		fail(1)
+	}
+}
+
+func fail(code int) {
+	os.Exit(code)
+}
+
+func run() error {
 	if err := log.InitializeLogger("INFO"); err != nil {
 		slog.Error("failed to initialize logger", "err", err)
-		os.Exit(1)
+		return err
 	}
 	config := parseFlags()
 
@@ -35,10 +65,10 @@ func main() {
 	storage, db, err := newMetricsRepository(appCtx, config)
 	if err != nil {
 		slog.Error("failed to initialize storage", "err", err)
-		os.Exit(1)
+		return err
 	}
 	if db != nil {
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 	}
 
 	if persistent, ok := storage.(repo.PersistentRepository); ok && !(*config.StoreInterval == 0) {
@@ -71,16 +101,26 @@ func main() {
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("failed to start http server", "err", err)
-			os.Exit(1)
+			serverErr <- err
+			return
 		}
+		serverErr <- nil
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+
+	select {
+	case <-quit:
+	case err := <-serverErr:
+		if err != nil {
+			return err
+		}
+	}
 
 	if persistent, ok := storage.(repo.PersistentRepository); ok {
 		if err := persistent.Save(); err != nil {
@@ -96,6 +136,8 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server shutdown failed", "err", err)
 	}
+
+	return nil
 }
 
 // newMetricsRepository создаёт хранилище метрик на основе конфигурации:
@@ -108,7 +150,9 @@ func newMetricsRepository(ctx context.Context, config Config) (repo.MetricsRepos
 		}
 
 		if err := runMigrations(db); err != nil {
-			db.Close()
+			if db != nil {
+				_ = db.Close()
+			}
 			return nil, nil, err
 		}
 		slog.Info("database migrations applied")

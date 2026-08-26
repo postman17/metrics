@@ -35,22 +35,22 @@ func (s *FileSubscriber) send(ip string, metrics []string) error {
 	}
 
 	dir := filepath.Dir(s.FilePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	if mkdirErr := os.MkdirAll(dir, 0755); mkdirErr != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, mkdirErr)
 	}
 
 	file, err := os.OpenFile(s.FilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open/create file %s: %w", s.FilePath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
-	if _, err := file.Write(data); err != nil {
-		return fmt.Errorf("failed to write metrics data: %w", err)
+	if _, writeErr := file.Write(data); writeErr != nil {
+		return fmt.Errorf("failed to write metrics data: %w", writeErr)
 	}
 
-	if _, err := file.Write([]byte("\n")); err != nil {
-		return fmt.Errorf("failed to write newline separator: %w", err)
+	if _, nlErr := file.Write([]byte("\n")); nlErr != nil {
+		return fmt.Errorf("failed to write newline separator: %w", nlErr)
 	}
 
 	slog.Info("Data appended to file", "path", s.FilePath)
