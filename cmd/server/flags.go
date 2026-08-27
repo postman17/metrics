@@ -19,6 +19,7 @@ type Config struct {
 	Key             string `env:"KEY"`
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
+	CryptoKey       string `env:"CRYPTO_KEY"`
 }
 
 func parseFlags() Config {
@@ -31,6 +32,7 @@ func parseFlags() Config {
 		key             string
 		auditFile       string
 		auditURL        string
+		cryptoKey       string
 	)
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 	flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
@@ -42,6 +44,7 @@ func parseFlags() Config {
 	flag.StringVar(&key, "k", "", "key")
 	flag.StringVar(&auditFile, "h", "", "audit file")
 	flag.StringVar(&auditURL, "u", "", "audit url")
+	flag.StringVar(&cryptoKey, "crypto-key", "", "crypto key path")
 	flag.Parse()
 
 	cfg := Config{}
@@ -73,6 +76,9 @@ func parseFlags() Config {
 	if cfg.AuditURL != "" {
 		auditURL = cfg.AuditURL
 	}
+	if cfg.CryptoKey != "" {
+		cryptoKey = cfg.CryptoKey
+	}
 
 	return Config{
 		RunAddr:         runAddr,
@@ -83,5 +89,6 @@ func parseFlags() Config {
 		Key:             key,
 		AuditFile:       auditFile,
 		AuditURL:        auditURL,
+		CryptoKey:       cryptoKey,
 	}
 }

@@ -15,6 +15,7 @@ type Config struct {
 	PollInterval   int64  `env:"POLL_INTERVAL"`
 	RunAddr        string `env:"ADDRESS"`
 	Key            string `env:"KEY"`
+	CryptoKey      string `env:"CRYPTO_KEY"`
 }
 
 func addPrefix(s string) string {
@@ -30,12 +31,14 @@ func parseFlags() Config {
 		pollInterval   int64
 		runAddr        string
 		key            string
+		cryptoKey      string
 	)
 
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 	flag.Int64Var(&reportInterval, "r", 10, "reportInterval")
 	flag.Int64Var(&pollInterval, "p", 2, "pollInterval")
 	flag.StringVar(&key, "k", "", "key")
+	flag.StringVar(&cryptoKey, "crypto-key", "", "crypto key path")
 	flag.Parse()
 
 	cfg := Config{}
@@ -51,8 +54,8 @@ func parseFlags() Config {
 	if cfg.PollInterval != 0 {
 		pollInterval = cfg.PollInterval
 	}
-	if cfg.Key != "" {
-		key = cfg.Key
+	if cfg.CryptoKey != "" {
+		cryptoKey = cfg.CryptoKey
 	}
 
 	return Config{
@@ -60,5 +63,6 @@ func parseFlags() Config {
 		PollInterval:   pollInterval,
 		RunAddr:        addPrefix(runAddr),
 		Key:            key,
+		CryptoKey:      cryptoKey,
 	}
 }

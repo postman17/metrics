@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	audit "github.com/postman17/metrics/internal/audit"
+	cryptomw "github.com/postman17/metrics/internal/crypto"
 	dbconfig "github.com/postman17/metrics/internal/config/db"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
@@ -59,6 +61,16 @@ func run() error {
 	}
 	config := parseFlags()
 
+	var privKey *rsa.PrivateKey
+	if config.CryptoKey != "" {
+		loaded, err := cryptomw.LoadPrivateKey(config.CryptoKey)
+		if err != nil {
+			slog.Error("load private key error", "err", err)
+			return err
+		}
+		privKey = loaded
+	}
+
 	appCtx, appCancel := context.WithCancel(context.Background())
 	defer appCancel()
 
@@ -85,6 +97,7 @@ func run() error {
 
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
+	r.Use(cryptomw.Middleware(privKey))
 	r.Use(gzip.GZIPMiddleware)
 	r.Use(sha256mw.Middleware(config.Key))
 
