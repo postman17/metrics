@@ -208,7 +208,7 @@ func main() {
 	if config.CryptoKey != "" {
 		pubKeyLoad, err := loadPublicKey(config.CryptoKey)
 		if err != nil {
-			fmt.Println("Load pem error: %v", err)
+			fmt.Printf("Load pem error: %v\n", err)
 		}
 		pubKey = pubKeyLoad
 	}

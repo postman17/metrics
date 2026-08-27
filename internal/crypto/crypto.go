@@ -80,12 +80,12 @@ func Encrypt(pubKey *rsa.PublicKey, plaintext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("create GCM: %w", err)
 	}
 	nonce := make([]byte, gcm.NonceSize())
-	if _, err := cryptRand.Read(nonce); err != nil {
-		return nil, fmt.Errorf("generate nonce: %w", err)
+	if _, err2 := cryptRand.Read(nonce); err2 != nil {
+		return nil, fmt.Errorf("generate nonce: %w", err2)
 	}
-	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, []byte{})
 
-	encAESKey, err := rsa.EncryptOAEP(sha256.New(), cryptRand.Reader, pubKey, aesKey, nil)
+	encAESKey, err := rsa.EncryptOAEP(sha256.New(), cryptRand.Reader, pubKey, aesKey, []byte{})
 	if err != nil {
 		return nil, fmt.Errorf("encrypt AES key with RSA: %w", err)
 	}
@@ -114,7 +114,7 @@ func Decrypt(privKey *rsa.PrivateKey, data []byte) ([]byte, error) {
 	encAESKey := data[:keyLen]
 	ciphertext := data[keyLen:]
 
-	aesKey, err := rsa.DecryptOAEP(sha256.New(), nil, privKey, encAESKey, nil)
+	aesKey, err := rsa.DecryptOAEP(sha256.New(), nil, privKey, encAESKey, []byte{})
 	if err != nil {
 		return nil, fmt.Errorf("decrypt AES key with RSA: %w", err)
 	}
@@ -134,7 +134,7 @@ func Decrypt(privKey *rsa.PrivateKey, data []byte) ([]byte, error) {
 	nonce := ciphertext[:nonceSize]
 	ciphertext = ciphertext[nonceSize:]
 
-	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := gcm.Open([]byte{}, nonce, ciphertext, []byte{})
 	if err != nil {
 		return nil, fmt.Errorf("decrypt with AES-GCM: %w", err)
 	}
@@ -150,7 +150,7 @@ func Middleware(privKey *rsa.PrivateKey) func(http.Handler) http.Handler {
 			}
 
 			body, err := io.ReadAll(r.Body)
-			r.Body.Close()
+			_ = r.Body.Close()
 			if err != nil {
 				slog.Error("crypto middleware: read body", "err", err)
 				w.WriteHeader(http.StatusBadRequest)
