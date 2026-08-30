@@ -5,28 +5,32 @@ import (
 	"fmt"
 	"go/ast"
 	"go/format"
-	"go/parser"
 	"go/token"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 const marker = "//generate:reset"
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+	}
+}
+
+func run() error {
 	root, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "getwd: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("getwd: %w", err)
 	}
 
 	fset := token.NewFileSet()
 	pkgs, err := parseDirRecursive(fset, root)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "parse: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("parse: %w", err)
 	}
 
 	for dir, pkg := range pkgs {
@@ -37,49 +41,38 @@ func main() {
 
 		code, err := generateFile(pkg.Name, structs)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "generate %s: %v\n", dir, err)
-			os.Exit(1)
+			return fmt.Errorf("generate %s: %w", dir, err)
 		}
 
-		outPath := filepath.Join(dir, "reset.gen.go")
+		outPath := filepath.Join(pkg.GoFiles[0][:len(pkg.GoFiles[0])-len(filepath.Base(pkg.GoFiles[0]))], "reset.gen.go")
 		if err := os.WriteFile(outPath, code, 0o644); err != nil {
-			fmt.Fprintf(os.Stderr, "write %s: %v\n", outPath, err)
-			os.Exit(1)
+			return fmt.Errorf("write %s: %w", outPath, err)
 		}
 		fmt.Printf("generated %s\n", outPath)
 	}
+	return nil
 }
 
-func parseDirRecursive(fset *token.FileSet, root string) (map[string]*ast.Package, error) {
-	result := make(map[string]*ast.Package)
-
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+func parseDirRecursive(fset *token.FileSet, root string) (map[string]*packages.Package, error) {
+	cfg := &packages.Config{
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax,
+		Fset: fset,
+	}
+	pkgs, err := packages.Load(cfg, "./...")
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]*packages.Package)
+	for _, pkg := range pkgs {
+		if len(pkg.Errors) > 0 {
+			continue
 		}
-		if !d.IsDir() {
-			return nil
+		if strings.HasPrefix(pkg.PkgPath, "cmd") {
+			continue
 		}
-
-		rel, _ := filepath.Rel(root, path)
-		if rel == "cmd" || strings.HasPrefix(rel, "cmd"+string(filepath.Separator)) {
-			return fs.SkipDir
-		}
-
-		pkgs, err := parser.ParseDir(fset, path, func(fi fs.FileInfo) bool {
-			return !strings.HasSuffix(fi.Name(), "_test.go") && !strings.HasSuffix(fi.Name(), ".gen.go")
-		}, parser.ParseComments)
-		if err != nil {
-			return nil
-		}
-
-		for _, pkg := range pkgs {
-			result[path] = pkg
-		}
-		return nil
-	})
-
-	return result, err
+		result[pkg.PkgPath] = pkg
+	}
+	return result, nil
 }
 
 type structInfo struct {
@@ -87,10 +80,10 @@ type structInfo struct {
 	fields []*ast.Field
 }
 
-func findMarkedStructs(pkg *ast.Package) []structInfo {
+func findMarkedStructs(pkg *packages.Package) []structInfo {
 	var result []structInfo
 
-	for _, f := range pkg.Files {
+	for _, f := range pkg.Syntax {
 		for _, decl := range f.Decls {
 			gd, ok := decl.(*ast.GenDecl)
 			if !ok || gd.Tok != token.TYPE {

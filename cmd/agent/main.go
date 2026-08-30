@@ -6,15 +6,18 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
+	"os"
 	"runtime"
 	"time"
 
+	cryptopkg "github.com/postman17/metrics/internal/crypto"
 	"github.com/mailru/easyjson"
 	models "github.com/postman17/metrics/internal/model"
 )
@@ -38,7 +41,21 @@ func getHash(key string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func sendGzipJSON(client http.Client, url string, jsonData []byte, key string) (*http.Response, error) {
+func loadPublicKey(path string) (*rsa.PublicKey, error) {
+	pemBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read file error: %w", err)
+	}
+	return cryptopkg.ParsePublicKey(pemBytes)
+}
+
+func sendGzipJSON(
+	client http.Client,
+	url string,
+	jsonData []byte,
+	key string,
+	pubKey *rsa.PublicKey,
+) (*http.Response, error) {
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
 	if _, err := gzWriter.Write(jsonData); err != nil {
@@ -50,7 +67,21 @@ func sendGzipJSON(client http.Client, url string, jsonData []byte, key string) (
 		return nil, err
 	}
 
-	body := buf.Bytes()
+	var body []byte
+	contentType := "application/json"
+
+	if pubKey != nil {
+		encData, err := cryptopkg.Encrypt(pubKey, buf.Bytes())
+		if err != nil {
+			slog.Error("Encryption error", "err", err)
+			return nil, err
+		}
+		body = encData
+		contentType = "application/octet-stream"
+	} else {
+		body = buf.Bytes()
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= len(sendGzipJSONRetryDelays); attempt++ {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(body))
@@ -59,7 +90,7 @@ func sendGzipJSON(client http.Client, url string, jsonData []byte, key string) (
 			return nil, err
 		}
 
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")
 		req.Header.Set("HashSHA256", getHash(key))
@@ -85,7 +116,12 @@ func sendGzipJSON(client http.Client, url string, jsonData []byte, key string) (
 
 // SendBatchRequest отправляет срез метрик на сервер пакетным POST-запросом
 // по пути /updates/ с gzip-сжатием тела и подписью HashSHA256.
-func SendBatchRequest(client http.Client, config Config, metrics models.MetricsList) (*http.Response, error) {
+func SendBatchRequest(
+	client http.Client,
+	config Config,
+	metrics models.MetricsList,
+	pubKey *rsa.PublicKey,
+) (*http.Response, error) {
 	url := fmt.Sprintf("%s/updates/", config.RunAddr)
 
 	jsonData, err := easyjson.Marshal(metrics)
@@ -94,7 +130,7 @@ func SendBatchRequest(client http.Client, config Config, metrics models.MetricsL
 		return nil, err
 	}
 
-	resp, err := sendGzipJSON(client, url, jsonData, config.Key)
+	resp, err := sendGzipJSON(client, url, jsonData, config.Key, pubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +204,14 @@ func main() {
 	fmt.Println("Build commit:", buildCommit)
 
 	config := parseFlags()
+	var pubKey *rsa.PublicKey
+	if config.CryptoKey != "" {
+		pubKeyLoad, err := loadPublicKey(config.CryptoKey)
+		if err != nil {
+			fmt.Printf("Load pem error: %v\n", err)
+		}
+		pubKey = pubKeyLoad
+	}
 
 	tickerPoll := time.NewTicker(time.Duration(config.PollInterval) * time.Second)
 	tickerReport := time.NewTicker(time.Duration(config.ReportInterval) * time.Second)
@@ -183,7 +227,7 @@ func main() {
 			runtime.ReadMemStats(&m)
 			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
-			resp, err := SendBatchRequest(*client, config, runtimeMetrics(&m))
+			resp, err := SendBatchRequest(*client, config, runtimeMetrics(&m), pubKey)
 			if err != nil {
 				slog.Error("Send batch metrics error", "err", err)
 			} else {

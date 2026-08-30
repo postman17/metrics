@@ -49,3 +49,16 @@ git fetch template && git checkout template/v2 .github
 migrate create -ext sql -dir ./migrations -seq create_metrics_table
 Применение миграции
 migrate -database "postgres://metrics_user:metrics_user_password@localhost:5432/metrics?sslmode=disable" -path ./migrations up
+
+
+### Генерация ключей шифрования
+```bash
+# Приватный ключ (передаётся серверу через -crypto-key или CRYPTO_KEY)
+openssl genrsa -out private.pem 2048
+
+# Публичный ключ PKIX/PEM (передаётся агенту через -crypto-key или CRYPTO_KEY)
+openssl rsa -pubout -in private.pem -out public.pem
+```
+**Использование:**
+- Агент: `./agent -crypto-key=./public.pem` или `CRYPTO_KEY=./public.pem`
+- Сервер: `./server -crypto-key=./private.pem` или `CRYPTO_KEY=./private.pem`
