@@ -14,11 +14,13 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 	"time"
 
-	cryptopkg "github.com/postman17/metrics/internal/crypto"
 	"github.com/mailru/easyjson"
+	cryptopkg "github.com/postman17/metrics/internal/crypto"
 	models "github.com/postman17/metrics/internal/model"
 )
 
@@ -189,6 +191,20 @@ func runtimeMetrics(m *runtime.MemStats) models.MetricsList {
 	}
 }
 
+func sendData(
+	client *http.Client,
+	config Config,
+	m *runtime.MemStats,
+	pubKey *rsa.PublicKey,
+) {
+	resp, err := SendBatchRequest(*client, config, runtimeMetrics(m), pubKey)
+	if err != nil {
+		slog.Error("Send batch metrics error", "err", err)
+	} else {
+		_ = resp.Body.Close()
+	}
+}
+
 func main() {
 	if buildVersion == "" {
 		buildVersion = "N/A"
@@ -221,19 +237,37 @@ func main() {
 		Timeout: 10 * time.Second,
 	}
 	var m runtime.MemStats
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 	for {
 		select {
 		case t1 := <-tickerPoll.C:
 			runtime.ReadMemStats(&m)
 			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
-			resp, err := SendBatchRequest(*client, config, runtimeMetrics(&m), pubKey)
-			if err != nil {
-				slog.Error("Send batch metrics error", "err", err)
-			} else {
-				_ = resp.Body.Close()
-			}
+			sendData(
+				client,
+				config,
+				&m,
+				pubKey,
+			)
 			slog.Info("Slow tic:", "time", t2)
+		case <-ctx.Done():
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			done := make(chan struct{})
+			go func() {
+				sendData(client, config, &m, pubKey)
+				close(done)
+			}()
+			select {
+			case <-done:
+				slog.Info("Final data sent successfully. Agent done.")
+			case <-shutdownCtx.Done():
+				slog.Error("Shutdown timed out!")
+			}
+			cancel()
+			slog.Info("Agent done")
+			return
 		}
 	}
 }
