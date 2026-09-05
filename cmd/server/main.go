@@ -16,8 +16,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	audit "github.com/postman17/metrics/internal/audit"
-	cryptomw "github.com/postman17/metrics/internal/crypto"
 	dbconfig "github.com/postman17/metrics/internal/config/db"
+	cryptomw "github.com/postman17/metrics/internal/crypto"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
@@ -125,7 +125,7 @@ func run() error {
 	}()
 
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	select {
 	case <-quit:

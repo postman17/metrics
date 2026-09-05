@@ -225,6 +225,7 @@ func main() {
 		pubKeyLoad, err := loadPublicKey(config.CryptoKey)
 		if err != nil {
 			fmt.Printf("Load pem error: %v\n", err)
+			return
 		}
 		pubKey = pubKeyLoad
 	}
@@ -237,7 +238,7 @@ func main() {
 		Timeout: 10 * time.Second,
 	}
 	var m runtime.MemStats
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 	for {
 		select {
