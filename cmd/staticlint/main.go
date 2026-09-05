@@ -40,19 +40,15 @@ func readConfig() ([]byte, error) {
 }
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-	}
-}
-
-func run() error {
 	data, err := readConfig()
 	if err != nil {
-		return fmt.Errorf("read config: %w", err)
+		fmt.Fprintf(os.Stderr, "read config: %v\n", err)
+		return
 	}
 	var cfg ConfigData
-	if err := yaml.Unmarshal([]byte(data), &cfg); err != nil {
-		return fmt.Errorf("unmarshal: %w", err)
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		fmt.Fprintf(os.Stderr, "unmarshal: %v\n", err)
+		return
 	}
 	mychecks := []*analysis.Analyzer{
 		printf.Analyzer,
@@ -72,10 +68,8 @@ func run() error {
 		}
 	}
 	if err := config.Analyzer.Flags.Set(config.ExcludePkgsFlag, "compress/gzip,go/parser,go/printer,go/types,go/ast,go/doc,go.uber.org/nilaway,golang.org/x/tools"); err != nil {
-		return fmt.Errorf("flags: %w", err)
+		fmt.Fprintf(os.Stderr, "flags: %v\n", err)
+		return
 	}
-	multichecker.Main(
-		mychecks...,
-	)
-	return nil
+	multichecker.Main(mychecks...)
 }
