@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
@@ -98,10 +99,13 @@ func sendGzipJSON(
 		req.Header.Set("HashSHA256", getHash(key))
 
 		resp, err := client.Do(req)
-		if err == nil {
+		if err == nil && resp != nil {
 			return resp, nil
 		}
 
+		if err == nil {
+			err = errors.New("nil response")
+		}
 		lastErr = err
 		if attempt == len(sendGzipJSONRetryDelays) {
 			break
@@ -112,6 +116,9 @@ func sendGzipJSON(
 		time.Sleep(delay)
 	}
 
+	if lastErr == nil {
+		lastErr = errors.New("send request failed")
+	}
 	fmt.Printf("Send request error: %v\n", lastErr)
 	return nil, lastErr
 }
