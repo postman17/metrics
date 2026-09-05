@@ -13,16 +13,6 @@ import (
 	repo "github.com/postman17/metrics/internal/repository"
 )
 
-func checkPostResp(resp *http.Response, err error) (*http.Response, error) {
-	if err != nil {
-		return nil, err
-	}
-	if resp == nil {
-		return nil, fmt.Errorf("nil response from http.Post")
-	}
-	return resp, nil
-}
-
 func ExampleUpdateMetric_gauge() {
 	storage := repo.NewMemStorage()
 	srv := httptest.NewServer(http.HandlerFunc(UpdateMetric(storage)))
@@ -34,8 +24,8 @@ func ExampleUpdateMetric_gauge() {
 		Value: ptrFloat64(42.5),
 	})
 
-	resp, err := checkPostResp(http.Post(srv.URL+"/update/", "application/json", bytes.NewReader(body)))
-	if err != nil {
+	resp, err := http.Post(srv.URL+"/update/", "application/json", bytes.NewReader(body))
+	if err != nil || resp == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -59,8 +49,8 @@ func ExampleUpdateMetric_counter() {
 		MType: models.Counter,
 		Delta: ptrInt64(5),
 	})
-	resp1, err := checkPostResp(http.Post(srv.URL+"/update/", "application/json", bytes.NewReader(body1)))
-	if err != nil {
+	resp1, err := http.Post(srv.URL+"/update/", "application/json", bytes.NewReader(body1))
+	if err != nil || resp1 == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -71,8 +61,8 @@ func ExampleUpdateMetric_counter() {
 		MType: models.Counter,
 		Delta: ptrInt64(3),
 	})
-	resp2, err := checkPostResp(http.Post(srv.URL+"/update/", "application/json", bytes.NewReader(body2)))
-	if err != nil {
+	resp2, err := http.Post(srv.URL+"/update/", "application/json", bytes.NewReader(body2))
+	if err != nil || resp2 == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -94,8 +84,8 @@ func ExampleUpdateMetric_badRequest() {
 		MType: models.Gauge,
 	})
 
-	resp, err := checkPostResp(http.Post(srv.URL+"/update/", "application/json", bytes.NewReader(body)))
-	if err != nil {
+	resp, err := http.Post(srv.URL+"/update/", "application/json", bytes.NewReader(body))
+	if err != nil || resp == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -115,8 +105,8 @@ func ExampleGetMetricValue_gauge() {
 	defer srv.Close()
 
 	reqBody, _ := json.Marshal(models.GetMetricRequest{ID: "Alloc", MType: models.Gauge})
-	resp, err := checkPostResp(http.Post(srv.URL+"/value/", "application/json", bytes.NewReader(reqBody)))
-	if err != nil {
+	resp, err := http.Post(srv.URL+"/value/", "application/json", bytes.NewReader(reqBody))
+	if err != nil || resp == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -143,8 +133,8 @@ func ExampleGetMetricValue_counter() {
 	defer srv.Close()
 
 	reqBody, _ := json.Marshal(models.GetMetricRequest{ID: "PollCount", MType: models.Counter})
-	resp, err := checkPostResp(http.Post(srv.URL+"/value/", "application/json", bytes.NewReader(reqBody)))
-	if err != nil {
+	resp, err := http.Post(srv.URL+"/value/", "application/json", bytes.NewReader(reqBody))
+	if err != nil || resp == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -167,8 +157,8 @@ func ExampleGetMetricValue_notFound() {
 	defer srv.Close()
 
 	reqBody, _ := json.Marshal(models.GetMetricRequest{ID: "Unknown", MType: models.Gauge})
-	resp, err := checkPostResp(http.Post(srv.URL+"/value/", "application/json", bytes.NewReader(reqBody)))
-	if err != nil {
+	resp, err := http.Post(srv.URL+"/value/", "application/json", bytes.NewReader(reqBody))
+	if err != nil || resp == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -194,8 +184,8 @@ func ExampleUpdatesMetric() {
 	}
 
 	body, _ := json.Marshal(batch)
-	resp, err := checkPostResp(http.Post(srv.URL+"/updates/", "application/json", bytes.NewReader(body)))
-	if err != nil {
+	resp, err := http.Post(srv.URL+"/updates/", "application/json", bytes.NewReader(body))
+	if err != nil || resp == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -224,8 +214,8 @@ func ExampleUpdatesMetric_counterAccumulation() {
 		{ID: "PollCount", MType: models.Counter, Delta: ptrInt64(5)},
 	}
 	body1, _ := json.Marshal(batch1)
-	resp1, err := checkPostResp(http.Post(srv.URL+"/updates/", "application/json", bytes.NewReader(body1)))
-	if err != nil {
+	resp1, err := http.Post(srv.URL+"/updates/", "application/json", bytes.NewReader(body1))
+	if err != nil || resp1 == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -235,8 +225,8 @@ func ExampleUpdatesMetric_counterAccumulation() {
 		{ID: "PollCount", MType: models.Counter, Delta: ptrInt64(7)},
 	}
 	body2, _ := json.Marshal(batch2)
-	resp2, err := checkPostResp(http.Post(srv.URL+"/updates/", "application/json", bytes.NewReader(body2)))
-	if err != nil {
+	resp2, err := http.Post(srv.URL+"/updates/", "application/json", bytes.NewReader(body2))
+	if err != nil || resp2 == nil {
 		fmt.Println("error:", err)
 		return
 	}
@@ -260,8 +250,8 @@ func ExampleUpdatesMetric_invalidMetric() {
 	}
 
 	body, _ := json.Marshal(batch)
-	resp, err := checkPostResp(http.Post(srv.URL+"/updates/", "application/json", bytes.NewReader(body)))
-	if err != nil {
+	resp, err := http.Post(srv.URL+"/updates/", "application/json", bytes.NewReader(body))
+	if err != nil || resp == nil {
 		fmt.Println("error:", err)
 		return
 	}

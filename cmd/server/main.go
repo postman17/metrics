@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	audit "github.com/postman17/metrics/internal/audit"
 	dbconfig "github.com/postman17/metrics/internal/config/db"
+	cryptomw "github.com/postman17/metrics/internal/crypto"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
@@ -59,6 +61,16 @@ func run() error {
 	}
 	config := parseFlags()
 
+	var privKey *rsa.PrivateKey
+	if config.CryptoKey != "" {
+		loaded, err := cryptomw.LoadPrivateKey(config.CryptoKey)
+		if err != nil {
+			slog.Error("load private key error", "err", err)
+			return err
+		}
+		privKey = loaded
+	}
+
 	appCtx, appCancel := context.WithCancel(context.Background())
 	defer appCancel()
 
@@ -85,6 +97,7 @@ func run() error {
 
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
+	r.Use(cryptomw.Middleware(privKey))
 	r.Use(gzip.GZIPMiddleware)
 	r.Use(sha256mw.Middleware(config.Key))
 
@@ -112,7 +125,7 @@ func run() error {
 	}()
 
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	select {
 	case <-quit:
