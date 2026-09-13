@@ -19,6 +19,7 @@ type Config struct {
 	AuditFile       string `env:"AUDIT_FILE"`
 	AuditURL        string `env:"AUDIT_URL"`
 	CryptoKey       string `env:"CRYPTO_KEY"`
+	TrustedSubnet   string `env:"TRUSTED_SUBNET"`
 }
 
 type serverJSONConfig struct {
@@ -31,6 +32,7 @@ type serverJSONConfig struct {
 	Key           string `json:"key"`
 	AuditFile     string `json:"audit_file"`
 	AuditURL      string `json:"audit_url"`
+	TrustedSubnet string `json:"trusted_subnet"`
 }
 
 func parseFlags() Config {
@@ -45,6 +47,7 @@ func parseFlags() Config {
 		auditURL        string
 		cryptoKey       string
 		jsonConfig      string
+		trustedSubnet   string
 	)
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
 	flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
@@ -57,6 +60,7 @@ func parseFlags() Config {
 	flag.StringVar(&cryptoKey, "crypto-key", "", "crypto key path")
 	flag.StringVar(&jsonConfig, "c", "", "json config file")
 	flag.StringVar(&jsonConfig, "config", "", "json config file")
+	flag.StringVar(&trustedSubnet, "t", "", "trusted subnet")
 	flag.Parse()
 
 	explicitFlags := make(map[string]bool)
@@ -107,6 +111,9 @@ func parseFlags() Config {
 	if jsonCfg.CryptoKey != "" && !explicitFlags["crypto-key"] {
 		cryptoKey = jsonCfg.CryptoKey
 	}
+	if jsonCfg.TrustedSubnet != "" && !explicitFlags["t"] {
+		trustedSubnet = jsonCfg.TrustedSubnet
+	}
 
 	cfg := Config{}
 	if err := env.Parse(&cfg); err != nil {
@@ -139,6 +146,9 @@ func parseFlags() Config {
 	if cfg.CryptoKey != "" {
 		cryptoKey = cfg.CryptoKey
 	}
+	if cfg.TrustedSubnet != "" {
+		trustedSubnet = cfg.TrustedSubnet
+	}
 
 	return Config{
 		RunAddr:         runAddr,
@@ -150,5 +160,6 @@ func parseFlags() Config {
 		AuditFile:       auditFile,
 		AuditURL:        auditURL,
 		CryptoKey:       cryptoKey,
+		TrustedSubnet:   trustedSubnet,
 	}
 }
