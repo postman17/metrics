@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -52,6 +53,23 @@ func loadPublicKey(path string) (*rsa.PublicKey, error) {
 	return cryptopkg.ParsePublicKey(pemBytes)
 }
 
+func getLocalIP() (string, error) {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+
+	for _, address := range addrs {
+		// Проверяем, что это IP-сеть и адрес не является loopback (127.0.0.1)
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("local ip address not found")
+}
+
 func sendGzipJSON(
 	client http.Client,
 	url string,
@@ -85,6 +103,11 @@ func sendGzipJSON(
 		body = buf.Bytes()
 	}
 
+	localIP, err := getLocalIP()
+	if err != nil {
+		localIP = "127.0.0.1"
+	}
+
 	var lastErr error
 	for attempt := 0; attempt <= len(sendGzipJSONRetryDelays); attempt++ {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(body))
@@ -93,6 +116,7 @@ func sendGzipJSON(
 			return nil, err
 		}
 
+		req.Header.Set("X-Real-IP", localIP)
 		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("Content-Encoding", "gzip")
 		req.Header.Set("Accept-Encoding", "gzip")

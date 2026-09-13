@@ -23,6 +23,7 @@ import (
 	log "github.com/postman17/metrics/internal/logger"
 	repo "github.com/postman17/metrics/internal/repository"
 	sha256mw "github.com/postman17/metrics/internal/sha256"
+	subnet "github.com/postman17/metrics/internal/subnet"
 )
 
 var (
@@ -100,6 +101,9 @@ func run() error {
 	r.Use(cryptomw.Middleware(privKey))
 	r.Use(gzip.GZIPMiddleware)
 	r.Use(sha256mw.Middleware(config.Key))
+	if config.TrustedSubnet != "" {
+		r.Use(subnet.Middleware(config.TrustedSubnet))
+	}
 
 	if db != nil {
 		r.Get("/ping", handlers.Ping(db))
