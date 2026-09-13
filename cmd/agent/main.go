@@ -67,7 +67,7 @@ func getLocalIP() (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("Local ip address not found")
+	return "", fmt.Errorf("local ip address not found")
 }
 
 func sendGzipJSON(
