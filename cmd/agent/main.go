@@ -1,5 +1,7 @@
 // Агент собирает runtime-метрики Go (runtime.MemStats) и периодически
-// отправляет их на сервер мониторинга пакетными POST-запросами.
+// отправляет их на сервер мониторинга. Поддерживается два транспорта:
+// HTTP (пакетная отправка gzip+JSON) и gRPC (метод UpdateMetrics).
+// Транспорт gRPC включается флагом -g / env GRPC.
 package main
 
 import (
@@ -24,6 +26,11 @@ import (
 	"github.com/mailru/easyjson"
 	cryptopkg "github.com/postman17/metrics/internal/crypto"
 	models "github.com/postman17/metrics/internal/model"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+
+	pb "github.com/postman17/metrics/pkg/proto"
 )
 
 var (
@@ -170,6 +177,50 @@ func SendBatchRequest(
 	return resp, nil
 }
 
+func SendGRPCRequest(
+	ctx context.Context,
+	grpcClient pb.MetricsClient,
+	metrics models.MetricsList,
+) error {
+	localIP, err := getLocalIP()
+	if err != nil {
+		localIP = "127.0.0.1"
+	}
+
+	req := &pb.UpdateMetricsRequest{
+		Metrics: modelsToProto(metrics),
+	}
+
+	ctxWithIP := metadata.AppendToOutgoingContext(ctx, "x-real-ip", localIP)
+
+	_, err = grpcClient.UpdateMetrics(ctxWithIP, req)
+	if err != nil {
+		return fmt.Errorf("grpc UpdateMetrics: %w", err)
+	}
+	return nil
+}
+
+func modelsToProto(metrics models.MetricsList) []*pb.Metric {
+	result := make([]*pb.Metric, 0, len(metrics))
+	for _, m := range metrics {
+		pm := &pb.Metric{Id: m.ID}
+		switch m.MType {
+		case models.Counter:
+			pm.Type = pb.Metric_COUNTER
+			if m.Delta != nil {
+				pm.Delta = *m.Delta
+			}
+		default:
+			pm.Type = pb.Metric_GAUGE
+			if m.Value != nil {
+				pm.Value = *m.Value
+			}
+		}
+		result = append(result, pm)
+	}
+	return result
+}
+
 func gaugeMetric(name string, value float64) models.Metrics {
 	v := value
 	return models.Metrics{
@@ -223,12 +274,23 @@ func runtimeMetrics(m *runtime.MemStats) models.MetricsList {
 }
 
 func sendData(
+	ctx context.Context,
 	client *http.Client,
+	grpcClient pb.MetricsClient,
 	config Config,
 	m *runtime.MemStats,
 	pubKey *rsa.PublicKey,
 ) {
-	resp, err := SendBatchRequest(*client, config, runtimeMetrics(m), pubKey)
+	metrics := runtimeMetrics(m)
+
+	if grpcClient != nil {
+		if err := SendGRPCRequest(ctx, grpcClient, metrics); err != nil {
+			slog.Error("Send grpc metrics error", "err", err)
+		}
+		return
+	}
+
+	resp, err := SendBatchRequest(*client, config, metrics, pubKey)
 	if err != nil {
 		slog.Error("Send batch metrics error", "err", err)
 	} else {
@@ -261,6 +323,22 @@ func main() {
 		pubKey = pubKeyLoad
 	}
 
+	// gRPC-клиент создаётся при указании адреса через флаг -g или env GRPC.
+	var grpcClient pb.MetricsClient
+	if config.GrpcAddr != "" {
+		conn, err := grpc.NewClient(
+			config.GrpcAddr,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			fmt.Printf("Grpc connect error: %v\n", err)
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		grpcClient = pb.NewMetricsClient(conn)
+		slog.Info("grpc client configured", "addr", config.GrpcAddr)
+	}
+
 	tickerPoll := time.NewTicker(time.Duration(config.PollInterval) * time.Second)
 	tickerReport := time.NewTicker(time.Duration(config.ReportInterval) * time.Second)
 	defer tickerPoll.Stop()
@@ -278,7 +356,9 @@ func main() {
 			slog.Info("Fast tic:", "time", t1)
 		case t2 := <-tickerReport.C:
 			sendData(
+				ctx,
 				client,
+				grpcClient,
 				config,
 				&m,
 				pubKey,
@@ -288,7 +368,7 @@ func main() {
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			done := make(chan struct{})
 			go func() {
-				sendData(client, config, &m, pubKey)
+				sendData(ctx, client, grpcClient, config, &m, pubKey)
 				close(done)
 			}()
 			select {

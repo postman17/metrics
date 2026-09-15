@@ -11,6 +11,7 @@ import (
 
 type Config struct {
 	RunAddr         string `env:"ADDRESS"`
+	GrpcAddr        string `env:"GRPC"`
 	StoreInterval   *int64 `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         *bool  `env:"RESTORE"`
@@ -24,6 +25,7 @@ type Config struct {
 
 type serverJSONConfig struct {
 	Address       string `json:"address"`
+	GrpcAddr      string `json:"grpc_addr"`
 	Restore       *bool  `json:"restore"`
 	StoreInterval string `json:"store_interval"`
 	StoreFile     string `json:"store_file"`
@@ -38,6 +40,7 @@ type serverJSONConfig struct {
 func parseFlags() Config {
 	var (
 		runAddr         string
+		grpcAddr        string
 		storeInterval   int64
 		fileStoragePath string
 		restore         bool
@@ -50,6 +53,7 @@ func parseFlags() Config {
 		trustedSubnet   string
 	)
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&grpcAddr, "g", "", "address and port to run grpc server")
 	flag.Int64Var(&storeInterval, "i", 300, "store interval in seconds")
 	flag.StringVar(&fileStoragePath, "f", "", "file storage path")
 	flag.BoolVar(&restore, "r", false, "load previous values")
@@ -82,6 +86,9 @@ func parseFlags() Config {
 
 	if jsonCfg.Address != "" && !explicitFlags["a"] {
 		runAddr = jsonCfg.Address
+	}
+	if jsonCfg.GrpcAddr != "" && !explicitFlags["g"] {
+		grpcAddr = jsonCfg.GrpcAddr
 	}
 	if jsonCfg.StoreInterval != "" && !explicitFlags["i"] {
 		if secs, err := config.ParseDurationSeconds(jsonCfg.StoreInterval); err == nil {
@@ -122,6 +129,9 @@ func parseFlags() Config {
 	if cfg.RunAddr != "" {
 		runAddr = cfg.RunAddr
 	}
+	if cfg.GrpcAddr != "" {
+		grpcAddr = cfg.GrpcAddr
+	}
 	if cfg.StoreInterval != nil {
 		storeInterval = *cfg.StoreInterval
 	}
@@ -152,6 +162,7 @@ func parseFlags() Config {
 
 	return Config{
 		RunAddr:         runAddr,
+		GrpcAddr:        grpcAddr,
 		StoreInterval:   &storeInterval,
 		FileStoragePath: fileStoragePath,
 		Restore:         &restore,

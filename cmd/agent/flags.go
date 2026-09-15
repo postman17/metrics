@@ -14,12 +14,14 @@ type Config struct {
 	ReportInterval int64  `env:"REPORT_INTERVAL"`
 	PollInterval   int64  `env:"POLL_INTERVAL"`
 	RunAddr        string `env:"ADDRESS"`
+	GrpcAddr       string `env:"GRPC"`
 	Key            string `env:"KEY"`
 	CryptoKey      string `env:"CRYPTO_KEY"`
 }
 
 type agentJSONConfig struct {
 	Address        string `json:"address"`
+	GrpcAddr       string `json:"grpc_addr"`
 	ReportInterval string `json:"report_interval"`
 	PollInterval   string `json:"poll_interval"`
 	CryptoKey      string `json:"crypto_key"`
@@ -38,12 +40,14 @@ func parseFlags() Config {
 		reportInterval int64
 		pollInterval   int64
 		runAddr        string
+		grpcAddr       string
 		key            string
 		cryptoKey      string
 		jsonConfig     string
 	)
 
 	flag.StringVar(&runAddr, "a", "localhost:8080", "address and port to run server")
+	flag.StringVar(&grpcAddr, "g", "", "address and port of grpc server")
 	flag.Int64Var(&reportInterval, "r", 10, "reportInterval")
 	flag.Int64Var(&pollInterval, "p", 2, "pollInterval")
 	flag.StringVar(&key, "k", "", "key")
@@ -71,6 +75,9 @@ func parseFlags() Config {
 
 	if jsonCfg.Address != "" && !explicitFlags["a"] {
 		runAddr = jsonCfg.Address
+	}
+	if jsonCfg.GrpcAddr != "" && !explicitFlags["g"] {
+		grpcAddr = jsonCfg.GrpcAddr
 	}
 	if jsonCfg.ReportInterval != "" && !explicitFlags["r"] {
 		if secs, err := config.ParseDurationSeconds(jsonCfg.ReportInterval); err == nil {
@@ -100,6 +107,9 @@ func parseFlags() Config {
 	if cfg.RunAddr != "" {
 		runAddr = cfg.RunAddr
 	}
+	if cfg.GrpcAddr != "" {
+		grpcAddr = cfg.GrpcAddr
+	}
 	if cfg.ReportInterval != 0 {
 		reportInterval = cfg.ReportInterval
 	}
@@ -114,6 +124,7 @@ func parseFlags() Config {
 		ReportInterval: reportInterval,
 		PollInterval:   pollInterval,
 		RunAddr:        addPrefix(runAddr),
+		GrpcAddr:       grpcAddr,
 		Key:            key,
 		CryptoKey:      cryptoKey,
 	}

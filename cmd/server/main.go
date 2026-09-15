@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,12 +19,16 @@ import (
 	audit "github.com/postman17/metrics/internal/audit"
 	dbconfig "github.com/postman17/metrics/internal/config/db"
 	cryptomw "github.com/postman17/metrics/internal/crypto"
+	grpcserver "github.com/postman17/metrics/internal/grpcserver"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
 	repo "github.com/postman17/metrics/internal/repository"
 	sha256mw "github.com/postman17/metrics/internal/sha256"
 	subnet "github.com/postman17/metrics/internal/subnet"
+	"google.golang.org/grpc"
+
+	pb "github.com/postman17/metrics/pkg/proto"
 )
 
 var (
@@ -118,6 +123,34 @@ func run() error {
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
+	var (
+		grpcSrv   *grpc.Server
+		grpcErrCh chan error
+	)
+	if config.GrpcAddr != "" {
+		var opts []grpc.ServerOption
+		if config.TrustedSubnet != "" {
+			opts = append(opts, grpc.UnaryInterceptor(subnet.GRPCInterceptor(config.TrustedSubnet)))
+		}
+		grpcSrv = grpc.NewServer(opts...)
+		pb.RegisterMetricsServer(grpcSrv, grpcserver.New(storage))
+
+		lis, lisErr := net.Listen("tcp", config.GrpcAddr)
+		if lisErr != nil {
+			slog.Error("failed to listen grpc", "err", lisErr)
+			return lisErr
+		}
+		grpcErrCh = make(chan error, 1)
+		go func() {
+			slog.Info("starting grpc server", "addr", config.GrpcAddr)
+			if err := grpcSrv.Serve(lis); err != nil {
+				grpcErrCh <- err
+				return
+			}
+			grpcErrCh <- nil
+		}()
+	}
+
 	serverErr := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -137,6 +170,10 @@ func run() error {
 		if err != nil {
 			return err
 		}
+	case err := <-grpcErrCh:
+		if err != nil {
+			return err
+		}
 	}
 
 	if persistent, ok := storage.(repo.PersistentRepository); ok {
@@ -152,6 +189,10 @@ func run() error {
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server shutdown failed", "err", err)
+	}
+
+	if grpcSrv != nil {
+		grpcSrv.GracefulStop()
 	}
 
 	return nil
