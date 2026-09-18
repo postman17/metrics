@@ -1,21 +1,16 @@
-package crypto
+package rsacrypto
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	cryptRand "crypto/rand"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/pem"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-
-	"log/slog"
 )
 
 const aesKeySize = 32
@@ -45,29 +40,28 @@ func LoadPrivateKey(path string) (*rsa.PrivateKey, error) {
 	if block == nil {
 		return nil, fmt.Errorf("invalid PEM block")
 	}
-	var priv *rsa.PrivateKey
 	if block.Type == "RSA PRIVATE KEY" {
+		var priv *rsa.PrivateKey
 		priv, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-	} else {
-		key, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if err2 != nil {
-			return nil, fmt.Errorf("parse key error: %w (pkcs1: %v)", err2, err)
+		if err != nil {
+			return nil, fmt.Errorf("parse key error: %w", err)
 		}
-		rsaKey, ok := key.(*rsa.PrivateKey)
-		if !ok {
-			return nil, fmt.Errorf("not an RSA private key")
-		}
-		priv = rsaKey
+		return priv, nil
 	}
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, fmt.Errorf("parse key error: %w", err)
 	}
-	return priv, nil
+	rsaKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("not an RSA private key")
+	}
+	return rsaKey, nil
 }
 
 func Encrypt(pubKey *rsa.PublicKey, plaintext []byte) ([]byte, error) {
 	aesKey := make([]byte, aesKeySize)
-	if _, err := cryptRand.Read(aesKey); err != nil {
+	if _, err := rand.Read(aesKey); err != nil {
 		return nil, fmt.Errorf("generate AES key: %w", err)
 	}
 
@@ -80,12 +74,12 @@ func Encrypt(pubKey *rsa.PublicKey, plaintext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("create GCM: %w", err)
 	}
 	nonce := make([]byte, gcm.NonceSize())
-	if _, err2 := cryptRand.Read(nonce); err2 != nil {
-		return nil, fmt.Errorf("generate nonce: %w", err2)
+	if _, err = rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("generate nonce: %w", err)
 	}
 	ciphertext := gcm.Seal(nonce, nonce, plaintext, []byte{})
 
-	encAESKey, err := rsa.EncryptOAEP(sha256.New(), cryptRand.Reader, pubKey, aesKey, []byte{})
+	encAESKey, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubKey, aesKey, []byte{})
 	if err != nil {
 		return nil, fmt.Errorf("encrypt AES key with RSA: %w", err)
 	}
@@ -139,34 +133,4 @@ func Decrypt(privKey *rsa.PrivateKey, data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("decrypt with AES-GCM: %w", err)
 	}
 	return plaintext, nil
-}
-
-func Middleware(privKey *rsa.PrivateKey) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Header.Get("Content-Type") != "application/octet-stream" || privKey == nil {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			body, err := io.ReadAll(r.Body)
-			_ = r.Body.Close()
-			if err != nil {
-				slog.Error("crypto middleware: read body", "err", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			decrypted, err := Decrypt(privKey, body)
-			if err != nil {
-				slog.Error("crypto middleware: decrypt", "err", err)
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
-
-			r.Body = io.NopCloser(bytes.NewReader(decrypted))
-			r.Header.Set("Content-Type", "application/json")
-			next.ServeHTTP(w, r)
-		})
-	}
 }

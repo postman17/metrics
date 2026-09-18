@@ -119,6 +119,9 @@ func parseFlags() Config {
 	if cfg.CryptoKey != "" {
 		cryptoKey = cfg.CryptoKey
 	}
+	if cfg.Key != "" {
+		key = cfg.Key
+	}
 
 	return Config{
 		ReportInterval: reportInterval,

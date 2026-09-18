@@ -2,6 +2,7 @@ package main
 
 import (
 	"compress/gzip"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -42,7 +43,7 @@ func TestSendBatchRequest_MockTransport(t *testing.T) {
 		counterMetric("test_counter", 1),
 	}
 
-	resp, err := SendBatchRequest(*client, config, metrics, nil)
+	resp, err := sendBatchRequest(context.Background(), *client, config, metrics, nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer func() { _ = resp.Body.Close() }()
@@ -77,7 +78,7 @@ func TestSendBatchRequest_GzipPayload(t *testing.T) {
 		counterMetric("test_counter", 42),
 	}
 
-	resp, err := SendBatchRequest(http.Client{}, config, metrics, nil)
+	resp, err := sendBatchRequest(context.Background(), http.Client{}, config, metrics, nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	defer func() { _ = resp.Body.Close() }()

@@ -18,12 +18,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	audit "github.com/postman17/metrics/internal/audit"
 	dbconfig "github.com/postman17/metrics/internal/config/db"
-	cryptomw "github.com/postman17/metrics/internal/crypto"
 	grpcserver "github.com/postman17/metrics/internal/grpcserver"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
+	"github.com/postman17/metrics/internal/middleware"
 	repo "github.com/postman17/metrics/internal/repository"
+	"github.com/postman17/metrics/internal/rsacrypto"
 	sha256mw "github.com/postman17/metrics/internal/sha256"
 	subnet "github.com/postman17/metrics/internal/subnet"
 	"google.golang.org/grpc"
@@ -69,7 +70,7 @@ func run() error {
 
 	var privKey *rsa.PrivateKey
 	if config.CryptoKey != "" {
-		loaded, err := cryptomw.LoadPrivateKey(config.CryptoKey)
+		loaded, err := rsacrypto.LoadPrivateKey(config.CryptoKey)
 		if err != nil {
 			slog.Error("load private key error", "err", err)
 			return err
@@ -103,11 +104,15 @@ func run() error {
 
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
-	r.Use(cryptomw.Middleware(privKey))
+	r.Use(middleware.Crypto(privKey))
 	r.Use(gzip.GZIPMiddleware)
 	r.Use(sha256mw.Middleware(config.Key))
 	if config.TrustedSubnet != "" {
-		r.Use(subnet.Middleware(config.TrustedSubnet))
+		subnetMW, err := subnet.Middleware(config.TrustedSubnet)
+		if err != nil {
+			return fmt.Errorf("trusted subnet: %w", err)
+		}
+		r.Use(subnetMW)
 	}
 
 	if db != nil {

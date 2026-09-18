@@ -1,26 +1,23 @@
 package subnet
 
 import (
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 )
 
-func Middleware(trustedSubnet string) func(http.Handler) http.Handler {
+// Middleware проверяет, что IP-адрес агента из заголовка X-Real-IP принадлежит
+// доверенной подсети. CIDR валидируется один раз при создании middleware, чтобы
+// вызывающий код мог перехватить ошибку конфигурации на старте.
+func Middleware(trustedSubnet string) (func(http.Handler) http.Handler, error) {
 	_, trustedNet, err := net.ParseCIDR(trustedSubnet)
 	if err != nil {
-		slog.Error("cidr configuration error", "err", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("parse trusted subnet %q: %w", trustedSubnet, err)
 	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if trustedNet == nil {
-				http.Error(w, "Internal Server Error: Invalid network configuration", http.StatusInternalServerError)
-				return
-			}
-
 			realIPStr := r.Header.Get("X-Real-IP")
 
 			if realIPStr == "" {
@@ -42,5 +39,5 @@ func Middleware(trustedSubnet string) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(w, r)
 		})
-	}
+	}, nil
 }

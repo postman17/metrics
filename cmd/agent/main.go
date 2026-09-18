@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/mailru/easyjson"
-	cryptopkg "github.com/postman17/metrics/internal/crypto"
 	models "github.com/postman17/metrics/internal/model"
+	"github.com/postman17/metrics/internal/rsacrypto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -57,7 +57,7 @@ func loadPublicKey(path string) (*rsa.PublicKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read file error: %w", err)
 	}
-	return cryptopkg.ParsePublicKey(pemBytes)
+	return rsacrypto.ParsePublicKey(pemBytes)
 }
 
 func getLocalIP() (string, error) {
@@ -78,6 +78,7 @@ func getLocalIP() (string, error) {
 }
 
 func sendGzipJSON(
+	ctx context.Context,
 	client http.Client,
 	url string,
 	jsonData []byte,
@@ -99,7 +100,7 @@ func sendGzipJSON(
 	contentType := "application/json"
 
 	if pubKey != nil {
-		encData, err := cryptopkg.Encrypt(pubKey, buf.Bytes())
+		encData, err := rsacrypto.Encrypt(pubKey, buf.Bytes())
 		if err != nil {
 			slog.Error("Encryption error", "err", err)
 			return nil, err
@@ -117,7 +118,7 @@ func sendGzipJSON(
 
 	var lastErr error
 	for attempt := 0; attempt <= len(sendGzipJSONRetryDelays); attempt++ {
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 		if err != nil {
 			slog.Error("Create request error", "err", err)
 			return nil, err
@@ -154,9 +155,10 @@ func sendGzipJSON(
 	return nil, lastErr
 }
 
-// SendBatchRequest отправляет срез метрик на сервер пакетным POST-запросом
+// sendBatchRequest отправляет срез метрик на сервер пакетным POST-запросом
 // по пути /updates/ с gzip-сжатием тела и подписью HashSHA256.
-func SendBatchRequest(
+func sendBatchRequest(
+	ctx context.Context,
 	client http.Client,
 	config Config,
 	metrics models.MetricsList,
@@ -170,14 +172,14 @@ func SendBatchRequest(
 		return nil, err
 	}
 
-	resp, err := sendGzipJSON(client, url, jsonData, config.Key, pubKey)
+	resp, err := sendGzipJSON(ctx, client, url, jsonData, config.Key, pubKey)
 	if err != nil {
 		return nil, err
 	}
 	return resp, nil
 }
 
-func SendGRPCRequest(
+func sendGRPCRequest(
 	ctx context.Context,
 	grpcClient pb.MetricsClient,
 	metrics models.MetricsList,
@@ -284,13 +286,13 @@ func sendData(
 	metrics := runtimeMetrics(m)
 
 	if grpcClient != nil {
-		if err := SendGRPCRequest(ctx, grpcClient, metrics); err != nil {
+		if err := sendGRPCRequest(ctx, grpcClient, metrics); err != nil {
 			slog.Error("Send grpc metrics error", "err", err)
 		}
 		return
 	}
 
-	resp, err := SendBatchRequest(*client, config, metrics, pubKey)
+	resp, err := sendBatchRequest(ctx, *client, config, metrics, pubKey)
 	if err != nil {
 		slog.Error("Send batch metrics error", "err", err)
 	} else {
@@ -368,7 +370,7 @@ func main() {
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			done := make(chan struct{})
 			go func() {
-				sendData(ctx, client, grpcClient, config, &m, pubKey)
+				sendData(shutdownCtx, client, grpcClient, config, &m, pubKey)
 				close(done)
 			}()
 			select {

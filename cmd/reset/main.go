@@ -44,7 +44,7 @@ func run() error {
 			return fmt.Errorf("generate %s: %w", dir, err)
 		}
 
-		outPath := filepath.Join(pkg.GoFiles[0][:len(pkg.GoFiles[0])-len(filepath.Base(pkg.GoFiles[0]))], "reset.gen.go")
+		outPath := filepath.Join(filepath.Dir(pkg.GoFiles[0]), "reset.gen.go")
 		if err := os.WriteFile(outPath, code, 0o644); err != nil {
 			return fmt.Errorf("write %s: %w", outPath, err)
 		}
