@@ -4,9 +4,11 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,11 +18,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	audit "github.com/postman17/metrics/internal/audit"
 	dbconfig "github.com/postman17/metrics/internal/config/db"
+	grpcserver "github.com/postman17/metrics/internal/grpcserver"
 	gzip "github.com/postman17/metrics/internal/gzip"
 	handlers "github.com/postman17/metrics/internal/handler"
 	log "github.com/postman17/metrics/internal/logger"
+	"github.com/postman17/metrics/internal/middleware"
 	repo "github.com/postman17/metrics/internal/repository"
+	"github.com/postman17/metrics/internal/rsacrypto"
 	sha256mw "github.com/postman17/metrics/internal/sha256"
+	subnet "github.com/postman17/metrics/internal/subnet"
+	"google.golang.org/grpc"
+
+	pb "github.com/postman17/metrics/pkg/proto"
 )
 
 var (
@@ -59,6 +68,16 @@ func run() error {
 	}
 	config := parseFlags()
 
+	var privKey *rsa.PrivateKey
+	if config.CryptoKey != "" {
+		loaded, err := rsacrypto.LoadPrivateKey(config.CryptoKey)
+		if err != nil {
+			slog.Error("load private key error", "err", err)
+			return err
+		}
+		privKey = loaded
+	}
+
 	appCtx, appCancel := context.WithCancel(context.Background())
 	defer appCancel()
 
@@ -85,8 +104,16 @@ func run() error {
 
 	r := chi.NewRouter()
 	r.Use(log.WithLogging)
+	r.Use(middleware.Crypto(privKey))
 	r.Use(gzip.GZIPMiddleware)
 	r.Use(sha256mw.Middleware(config.Key))
+	if config.TrustedSubnet != "" {
+		subnetMW, err := subnet.Middleware(config.TrustedSubnet)
+		if err != nil {
+			return fmt.Errorf("trusted subnet: %w", err)
+		}
+		r.Use(subnetMW)
+	}
 
 	if db != nil {
 		r.Get("/ping", handlers.Ping(db))
@@ -101,6 +128,34 @@ func run() error {
 
 	srv := &http.Server{Addr: config.RunAddr, Handler: r}
 
+	var (
+		grpcSrv   *grpc.Server
+		grpcErrCh chan error
+	)
+	if config.GrpcAddr != "" {
+		var opts []grpc.ServerOption
+		if config.TrustedSubnet != "" {
+			opts = append(opts, grpc.UnaryInterceptor(subnet.GRPCInterceptor(config.TrustedSubnet)))
+		}
+		grpcSrv = grpc.NewServer(opts...)
+		pb.RegisterMetricsServer(grpcSrv, grpcserver.New(storage))
+
+		lis, lisErr := net.Listen("tcp", config.GrpcAddr)
+		if lisErr != nil {
+			slog.Error("failed to listen grpc", "err", lisErr)
+			return lisErr
+		}
+		grpcErrCh = make(chan error, 1)
+		go func() {
+			slog.Info("starting grpc server", "addr", config.GrpcAddr)
+			if err := grpcSrv.Serve(lis); err != nil {
+				grpcErrCh <- err
+				return
+			}
+			grpcErrCh <- nil
+		}()
+	}
+
 	serverErr := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -112,11 +167,15 @@ func run() error {
 	}()
 
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
 	select {
 	case <-quit:
 	case err := <-serverErr:
+		if err != nil {
+			return err
+		}
+	case err := <-grpcErrCh:
 		if err != nil {
 			return err
 		}
@@ -135,6 +194,10 @@ func run() error {
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server shutdown failed", "err", err)
+	}
+
+	if grpcSrv != nil {
+		grpcSrv.GracefulStop()
 	}
 
 	return nil
